@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package generator;
+
+option go_package = "agreements-generator/proto/generator;generator";
+
+service Generator {
+  rpc Generate (GenerateRequest) returns (GenerateResponse);
+}
+
+message GenerateRequest {
+  bytes archive = 1;
+}
+
+message GenerateResponse {
+  bytes zip_archive = 1;
+  repeated string errors = 2;
+  int32 generated_count = 3;
+}
