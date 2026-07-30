@@ -1,0 +1,9 @@
+env: "local"
+logger:
+  type: "zap"
+  level: "development"
+server:
+  port: 8080
+grpc_client:
+  host: "localhost"
+  port: 50051

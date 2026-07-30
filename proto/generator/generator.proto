@@ -14,6 +14,16 @@ message GenerateRequest {
 
 message GenerateResponse {
   bytes zip_archive = 1;
-  repeated string errors = 2;
+  repeated FileErrors errors = 2;
   int32 generated_count = 3;
+}
+
+message FileErrors {
+  string file_name = 1;
+  repeated FileError errors = 2;
+}
+
+message FileError {
+  int32 code = 1;
+  string message = 2;
 }

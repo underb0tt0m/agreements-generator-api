@@ -1,0 +1,3 @@
+[submodule "worker"]
+	path = worker
+	url = https://github.com/underb0tt0m/excel-docx-agreements-generator
