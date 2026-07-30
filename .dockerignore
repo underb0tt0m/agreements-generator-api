@@ -1,0 +1,11 @@
+.git
+.gitignore
+.dockerignore
+README.md
+test.zip
+worker/
+proto/
+Dockerfile
+Makefile
+gen/*
+!gen/go/

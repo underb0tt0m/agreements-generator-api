@@ -1,0 +1,16 @@
+services:
+  worker:
+    container_name: worker
+    build: ./worker/
+    ports:
+      - "50051:50051"
+  
+  server:
+    container_name: server
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config/local.yaml:/root/config.yaml
+    depends_on:
+      - worker

@@ -5,5 +5,5 @@ logger:
 server:
   port: 8080
 grpc_client:
-  host: "localhost"
+  host: "worker"
   port: 50051
