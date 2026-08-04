@@ -4,6 +4,7 @@ go 1.26
 
 require (
 	github.com/go-chi/chi/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	go.uber.org/zap v1.28.0
 	google.golang.org/grpc v1.82.1

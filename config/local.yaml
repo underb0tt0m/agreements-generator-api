@@ -4,6 +4,10 @@ logger:
   level: "development"
 server:
   port: 8080
+  shutdown_duration: "10s"
 grpc_client:
   host: "worker"
   port: 50051
+  job_max_duration: "30s"
+storage:
+  job_ttl: "5m"

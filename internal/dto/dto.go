@@ -3,9 +3,17 @@ package dto
 import "agreements-generator/gen/go/generator"
 
 type BulkGenerateResponse struct {
-	Archive    []byte        `json:"archive"`
-	ErrorsList []FilesErrors `json:"errors_list"`
-	GenCount   int           `json:"gen_count"`
+	JobID string `json:"job_id"`
+}
+
+type GetJobStatusResponse struct {
+	JobID  string `json:"job_id"`
+	Status string `json:"status"`
+}
+
+type GetArchiveInfoResponse struct {
+	GenErrs []FilesErrors `json:"generation_errors"`
+	GenCnt  int           `json:"generated_count"`
 }
 
 type FilesErrors struct {
@@ -13,7 +21,7 @@ type FilesErrors struct {
 	Errors   []string `json:"errors"`
 }
 
-func NewBulkGenerateResponse(archive []byte, grpcErrs []*generator.FileErrors, genCnt int) *BulkGenerateResponse {
+func NewGetArchiveInfoResponse(grpcErrs []*generator.FileErrors, genCnt int) *GetArchiveInfoResponse {
 	httpErrs := make([]FilesErrors, 0, len(grpcErrs))
 	for _, fileErrs := range grpcErrs {
 		errs := make([]string, 0, len(fileErrs.Errors))
@@ -25,9 +33,8 @@ func NewBulkGenerateResponse(archive []byte, grpcErrs []*generator.FileErrors, g
 			Errors:   errs,
 		})
 	}
-	return &BulkGenerateResponse{
-		Archive:    archive,
-		ErrorsList: httpErrs,
-		GenCount:   genCnt,
+	return &GetArchiveInfoResponse{
+		GenErrs: httpErrs,
+		GenCnt:  genCnt,
 	}
 }
