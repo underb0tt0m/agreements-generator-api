@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -13,6 +14,7 @@ type Config struct {
 	Log        logger     `yaml:"logger"`
 	Server     server     `yaml:"server"`
 	GRPCClient gRPCClient `yaml:"grpc_client"`
+	Storage    storage    `yaml:"storage"`
 }
 
 type logger struct {
@@ -21,11 +23,17 @@ type logger struct {
 }
 
 type server struct {
-	Port string `yaml:"port" env-default:"8080"`
+	Port             string        `yaml:"port" env-default:"8080"`
+	ShutdownDuration time.Duration `yaml:"shutdown_duration" env-default:"10s"`
 }
 type gRPCClient struct {
-	Host string `yaml:"host" env-default:"localhost"`
-	Port string `yaml:"port" env-default:"50051"`
+	Host           string        `yaml:"host" env-default:"localhost"`
+	Port           string        `yaml:"port" env-default:"50051"`
+	JobMaxDuration time.Duration `yaml:"job_max_duration" env-default:"60s"`
+}
+
+type storage struct {
+	JobTTL time.Duration `yaml:"job_ttl" env-default:"5m"`
 }
 
 func Load() (*Config, error) {

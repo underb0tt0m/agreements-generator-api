@@ -6,8 +6,10 @@ import (
 
 	"agreements-generator/internal/api/api_v1"
 	"agreements-generator/internal/config"
+	"agreements-generator/internal/encoder/encoder_json"
 	"agreements-generator/internal/logging"
 	"agreements-generator/internal/service"
+	"agreements-generator/internal/storage/storage_in_memory"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -18,15 +20,20 @@ type App struct {
 }
 
 func New(cfg *config.Config, l logging.Logger) (*App, error) {
-	gen, err := service.New(cfg, l)
+	appStorage := storage_in_memory.NewMemoryStorage(cfg)
+
+	gen, err := service.New(cfg, l, appStorage)
 	if err != nil {
 		return nil, err
 	}
+
+	encoder := encoder_json.New()
 
 	handler := api_v1.API{
 		Log:     l,
 		Cfg:     cfg,
 		Service: gen,
+		Encoder: encoder,
 	}
 
 	router := chi.NewRouter()

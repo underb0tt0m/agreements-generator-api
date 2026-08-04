@@ -33,11 +33,44 @@ func (e *AppErr) Is(target error) bool {
 	return e.Code == appErr.Code
 }
 
+func CheckAppErr(err error) *AppErr {
+	appErr, ok := errors.AsType[*AppErr](err)
+	if !ok {
+		return ErrStorageBadRequest.Wrap("bad storage request", err)
+	}
+	return appErr
+}
+
 var (
-	ErrInternal = AppErr{
+	ErrInternal = &AppErr{
 		Msg:        "internal server error",
 		HTTPStatus: http.StatusInternalServerError,
 		Code:       1000,
+		Err:        nil,
+	}
+	ErrBadRequest = &AppErr{
+		Msg:        "bad request",
+		HTTPStatus: http.StatusBadRequest,
+		Code:       1001,
+		Err:        nil,
+	}
+
+	ErrStorageBadRequest = &AppErr{
+		Msg:        "error during storage request",
+		HTTPStatus: http.StatusInternalServerError,
+		Code:       1002,
+		Err:        nil,
+	}
+	ErrNotFound = &AppErr{
+		Msg:        "source not found",
+		HTTPStatus: http.StatusNotFound,
+		Code:       1003,
+		Err:        nil,
+	}
+	ErrConflict = &AppErr{
+		Msg:        "conflict",
+		HTTPStatus: http.StatusConflict,
+		Code:       1004,
 		Err:        nil,
 	}
 )

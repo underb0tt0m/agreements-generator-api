@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"agreements-generator/internal/app"
 	"agreements-generator/internal/config"
@@ -54,7 +53,7 @@ func main() {
 
 		shutDownCtx, cancel := context.WithTimeout(
 			context.Background(),
-			10*time.Second)
+			cfg.Server.ShutdownDuration)
 		defer cancel()
 
 		if err = genApp.Server.Shutdown(shutDownCtx); err != nil {
