@@ -1,5 +1,7 @@
 package logging
 
+// можно смело называть логгер логгером и делать типа logger := logger.New(), -ing тут не нужон
+
 import (
 	"fmt"
 

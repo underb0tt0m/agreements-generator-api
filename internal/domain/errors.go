@@ -33,6 +33,14 @@ func (e *AppErr) Is(target error) bool {
 	return e.Code == appErr.Code
 }
 
+/*
+	эта функиця не нужна
+	глобально ошибки двух видов: ожидаемые и нет
+	проверять их нужно только в 1 месте - handler и там делать вывод, что отдать клиенту
+	1. Если ошибка твоя - то код и текст
+	2. Во всех остальных случаях 500/InternalServerError/Произошла непредвиденная ошибка
+*/
+
 func CheckAppErr(err error) *AppErr {
 	appErr, ok := errors.AsType[*AppErr](err)
 	if !ok {
@@ -46,31 +54,26 @@ var (
 		Msg:        "internal server error",
 		HTTPStatus: http.StatusInternalServerError,
 		Code:       1000,
-		Err:        nil,
 	}
 	ErrBadRequest = &AppErr{
 		Msg:        "bad request",
 		HTTPStatus: http.StatusBadRequest,
 		Code:       1001,
-		Err:        nil,
 	}
 
 	ErrStorageBadRequest = &AppErr{
 		Msg:        "error during storage request",
 		HTTPStatus: http.StatusInternalServerError,
 		Code:       1002,
-		Err:        nil,
 	}
 	ErrNotFound = &AppErr{
 		Msg:        "source not found",
 		HTTPStatus: http.StatusNotFound,
 		Code:       1003,
-		Err:        nil,
 	}
 	ErrConflict = &AppErr{
 		Msg:        "conflict",
 		HTTPStatus: http.StatusConflict,
 		Code:       1004,
-		Err:        nil,
 	}
 )
