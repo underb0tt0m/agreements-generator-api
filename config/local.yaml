@@ -11,3 +11,10 @@ grpc_client:
   job_max_duration: "30s"
 storage:
   job_ttl: "5m"
+jwt:
+  jwt_signing_method: "HS256" # support HS256, ES256, RS256
+  token_ttl: "1h"
+  prefix: "Bearer"
+security:
+  hash_cost: 10
+  

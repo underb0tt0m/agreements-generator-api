@@ -19,16 +19,25 @@ type JobData struct {
 	FatalError error
 }
 
+type UserData struct {
+	Name         string
+	Login        string
+	PasswordHash []byte
+	CreatedAt    time.Time
+}
+
 type MemoryStorage struct {
-	mu   sync.RWMutex
-	data map[string]*JobData
-	cfg  *config.Config
+	mu    sync.RWMutex
+	data  map[string]*JobData
+	users map[string]*UserData
+	cfg   *config.Config
 }
 
 func NewMemoryStorage(cfg *config.Config) *MemoryStorage {
 	s := &MemoryStorage{
-		data: make(map[string]*JobData),
-		cfg:  cfg,
+		data:  make(map[string]*JobData),
+		users: make(map[string]*UserData),
+		cfg:   cfg,
 	}
 
 	go s.cleanupLoop()
@@ -133,4 +142,31 @@ func (s *MemoryStorage) GetArchiveInfo(ctx context.Context, jobID string) ([]*ge
 		return nil, 0, domain.ErrBadRequest.Wrap("job not finished", nil)
 	}
 	return job.Errors, job.GenCount, nil
+}
+
+func (s *MemoryStorage) Register(ctx context.Context, user domain.User) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.users[user.Login]; exists {
+		return domain.ErrConflict.Wrap("user already exists", nil)
+	}
+
+	s.users[user.Login] = &UserData{
+		PasswordHash: user.Password,
+		Name:         user.Name,
+		CreatedAt:    time.Now(),
+	}
+	return nil
+}
+
+func (s *MemoryStorage) LogIn(ctx context.Context, login string) ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	userData, exists := s.users[login]
+	if !exists {
+		return nil, domain.ErrNotFound.Wrap("user not found", nil)
+	}
+	return userData.PasswordHash, nil
 }

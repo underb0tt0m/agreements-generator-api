@@ -16,3 +16,7 @@ func New() encoder.Encoder {
 func (e *json_encoder) Marshal(object any) ([]byte, error) {
 	return json.Marshal(object)
 }
+
+func (e *json_encoder) Unmarshal(data []byte, v any) error {
+	return json.Unmarshal(data, v)
+}

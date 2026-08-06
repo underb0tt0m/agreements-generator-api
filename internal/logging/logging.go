@@ -8,7 +8,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO добавить константы имен полей во избежание очепяток
+const (
+	FieldError string = "error"
+)
 
 type Logger interface {
 	Fatal(msg string, fields ...any)
@@ -55,23 +57,23 @@ func newZap(cfg *config.Config) (*zapLogger, error) {
 }
 
 func (l *zapLogger) Fatal(msg string, fields ...any) {
-	l.l.Fatal(msg, toZapFields(fields)...)
+	l.l.Fatal(msg, toZapFields(fields...)...)
 }
 
 func (l *zapLogger) Error(msg string, fields ...any) {
-	l.l.Error(msg, toZapFields(fields)...)
+	l.l.Error(msg, toZapFields(fields...)...)
 }
 
 func (l *zapLogger) Warn(msg string, fields ...any) {
-	l.l.Warn(msg, toZapFields(fields)...)
+	l.l.Warn(msg, toZapFields(fields...)...)
 }
 
 func (l *zapLogger) Debug(msg string, fields ...any) {
-	l.l.Debug(msg, toZapFields(fields)...)
+	l.l.Debug(msg, toZapFields(fields...)...)
 }
 
 func (l *zapLogger) Info(msg string, fields ...any) {
-	l.l.Info(msg, toZapFields(fields)...)
+	l.l.Info(msg, toZapFields(fields...)...)
 }
 
 func toZapFields(args ...any) []zap.Field {
@@ -104,7 +106,7 @@ func toZapFields(args ...any) []zap.Field {
 		case bool:
 			fields = append(fields, zap.Bool(key, v))
 		case error:
-			fields = append(fields, zap.Error(v))
+			fields = append(fields, zap.Error(v)) //TODO ну дичь какая-то, переделать надо логгер
 		case zap.Field:
 			fields = append(fields, v)
 		default:

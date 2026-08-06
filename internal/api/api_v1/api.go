@@ -11,6 +11,7 @@ import (
 	"agreements-generator/internal/encoder"
 	"agreements-generator/internal/logging"
 	"agreements-generator/internal/service"
+	"agreements-generator/internal/token_manager"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -33,11 +34,14 @@ type API struct {
 	Encoder encoder.Encoder
 }
 
-func (h *API) RegisterRoutes(r chi.Router) {
-	h.BulkGenerate(r)
-	h.GetJobStatus(r)
-	h.GetArchiveInfo(r)
-	h.GetArchive(r)
+func (h *API) RegisterRoutes(r chi.Router, tokenMaker token_manager.TokenManager) {
+	r.Group(func(r chi.Router) {
+		r.Use(MWAuth(tokenMaker, h.Encoder, h.Log))
+		h.BulkGenerate(r)
+		h.GetJobStatus(r)
+		h.GetArchiveInfo(r)
+		h.GetArchive(r)
+	})
 }
 
 func (h *API) BulkGenerate(r chi.Router) {
@@ -47,8 +51,8 @@ func (h *API) BulkGenerate(r chi.Router) {
 func (h *API) handleBulkGenerate(w http.ResponseWriter, r *http.Request) {
 	archiveBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		h.Log.Error("failed to read body", "error", err)
-		h.writeError(w, err)
+		h.Log.Error("failed to read body", logging.FieldError, err)
+		writeError(w, err, h.Encoder, h.Log)
 		return
 	}
 	defer r.Body.Close()
@@ -58,9 +62,9 @@ func (h *API) handleBulkGenerate(w http.ResponseWriter, r *http.Request) {
 	jobID, err := h.Service.BulkGenerate(r.Context(), archiveBytes)
 	if err != nil {
 		h.Log.Error("gRPC call failed",
-			"error", err.Error(),
+			logging.FieldError, err.Error(),
 		)
-		h.writeError(w, err)
+		writeError(w, err, h.Encoder, h.Log)
 		return
 	}
 	h.Log.Info("generation started")
@@ -70,11 +74,11 @@ func (h *API) handleBulkGenerate(w http.ResponseWriter, r *http.Request) {
 	responseBytes, err := h.Encoder.Marshal(responseDTO)
 	if err != nil {
 		h.Log.Error("failed to encode response body", err)
-		h.writeError(w, domain.ErrInternal.Wrap("failed to encode response body", nil))
+		writeError(w, domain.ErrInternal.Wrap("failed to encode response body", nil), h.Encoder, h.Log)
 		return
 	}
 
-	h.writeResponse(w, responseBytes, responseJSON)
+	writeResponse(w, responseBytes, responseJSON, h.Encoder, h.Log)
 }
 
 func (h *API) GetJobStatus(r chi.Router) {
@@ -84,16 +88,21 @@ func (h *API) GetJobStatus(r chi.Router) {
 func (h *API) handleGetJobStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		h.writeError(w, domain.ErrBadRequest.Wrap(
-			"query parameter ID is empty",
-			nil,
-		))
+		writeError(
+			w,
+			domain.ErrBadRequest.Wrap(
+				"query parameter ID is empty",
+				nil,
+			),
+			h.Encoder,
+			h.Log,
+		)
 		return
 	}
 
 	jobStatus, err := h.Service.CheckJobStatus(r.Context(), id)
 	if err != nil {
-		h.writeError(w, err)
+		writeError(w, err, h.Encoder, h.Log)
 		return
 	}
 
@@ -105,11 +114,11 @@ func (h *API) handleGetJobStatus(w http.ResponseWriter, r *http.Request) {
 	responseBytes, err := h.Encoder.Marshal(responseDTO)
 	if err != nil {
 		h.Log.Error("failed to encode response body", err)
-		h.writeError(w, domain.ErrInternal.Wrap("failed to encode response body", nil))
+		writeError(w, domain.ErrInternal.Wrap("failed to encode response body", nil), h.Encoder, h.Log)
 		return
 	}
 
-	h.writeResponse(w, responseBytes, responseJSON)
+	writeResponse(w, responseBytes, responseJSON, h.Encoder, h.Log)
 }
 
 func (h *API) GetArchive(r chi.Router) {
@@ -119,20 +128,25 @@ func (h *API) GetArchive(r chi.Router) {
 func (h *API) handleGetArchive(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		h.writeError(w, domain.ErrBadRequest.Wrap(
-			"query parameter ID is empty",
-			nil,
-		))
+		writeError(
+			w,
+			domain.ErrBadRequest.Wrap(
+				"query parameter ID is empty",
+				nil,
+			),
+			h.Encoder,
+			h.Log,
+		)
 		return
 	}
 
 	archive, err := h.Service.GetArchive(r.Context(), id)
 	if err != nil {
-		h.writeError(w, err)
+		writeError(w, err, h.Encoder, h.Log)
 		return
 	}
 
-	h.writeResponse(w, archive, responseZIP)
+	writeResponse(w, archive, responseZIP, h.Encoder, h.Log)
 }
 
 func (h *API) GetArchiveInfo(r chi.Router) {
@@ -142,16 +156,21 @@ func (h *API) GetArchiveInfo(r chi.Router) {
 func (h *API) handleGetArchiveInfo(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		h.writeError(w, domain.ErrBadRequest.Wrap(
-			"query parameter ID is empty",
-			nil,
-		))
+		writeError(
+			w,
+			domain.ErrBadRequest.Wrap(
+				"query parameter ID is empty",
+				nil,
+			),
+			h.Encoder,
+			h.Log,
+		)
 		return
 	}
 
 	genErrs, genCnt, err := h.Service.GetArchiveInfo(r.Context(), id)
 	if err != nil {
-		h.writeError(w, err)
+		writeError(w, err, h.Encoder, h.Log)
 		return
 	}
 
@@ -160,34 +179,34 @@ func (h *API) handleGetArchiveInfo(w http.ResponseWriter, r *http.Request) {
 	responseBytes, err := h.Encoder.Marshal(responseDTO)
 	if err != nil {
 		h.Log.Error("failed to encode response body", err)
-		h.writeError(w, domain.ErrInternal.Wrap("failed to encode response body", nil))
+		writeError(w, domain.ErrInternal.Wrap("failed to encode response body", nil), h.Encoder, h.Log)
 		return
 	}
 
-	h.writeResponse(w, responseBytes, responseJSON)
+	writeResponse(w, responseBytes, responseJSON, h.Encoder, h.Log)
 }
 
-func (h *API) writeResponse(w http.ResponseWriter, response []byte, responseType responseType) {
+func writeResponse(w http.ResponseWriter, response []byte, responseType responseType, enc encoder.Encoder, logger logging.Logger) {
 	w.Header().Set("Content-Type", responseType)
 	if _, err := w.Write(response); err != nil {
-		h.Log.Error("failed to write response body", "error", err)
-		h.writeError(w, domain.ErrInternal.Wrap("failed to write response body", nil))
+		logger.Error("failed to write response body", logging.FieldError, err)
+		writeError(w, domain.ErrInternal.Wrap("failed to write response body", nil), enc, logger)
 	}
 }
 
-func (h *API) writeError(w http.ResponseWriter, err error) {
+func writeError(w http.ResponseWriter, err error, enc encoder.Encoder, logger logging.Logger) {
 	appErr, ok := errors.AsType[*domain.AppErr](err)
 	if !ok {
 		w.WriteHeader(domain.ErrInternal.HTTPStatus)
 
 		body := errorResponse{Details: domain.ErrInternal.Msg}
-		responseBytes, encodeErr := h.Encoder.Marshal(body)
+		responseBytes, encodeErr := enc.Marshal(body)
 		if encodeErr != nil {
-			h.Log.Error("failed to encode error response body", "error", encodeErr)
+			logger.Error("failed to encode error response body", logging.FieldError, encodeErr)
 		}
 
 		if _, writeErr := w.Write(responseBytes); writeErr != nil {
-			h.Log.Error("failed to write error response body", "error", writeErr)
+			logger.Error("failed to write error response body", logging.FieldError, writeErr)
 		}
 		return
 	}
@@ -195,13 +214,13 @@ func (h *API) writeError(w http.ResponseWriter, err error) {
 	w.WriteHeader(appErr.HTTPStatus)
 
 	body := errorResponse{Details: appErr.Msg}
-	responseBytes, encodeErr := h.Encoder.Marshal(body)
+	responseBytes, encodeErr := enc.Marshal(body)
 	if encodeErr != nil {
-		h.Log.Error("failed to encode error response body", "error", encodeErr)
+		logger.Error("failed to encode error response body", logging.FieldError, encodeErr)
 	}
 
 	if _, writeErr := w.Write(responseBytes); writeErr != nil {
-		h.Log.Error("failed to write error response body", "error", writeErr)
+		logger.Error("failed to write error response body", logging.FieldError, writeErr)
 	}
 	return
 }

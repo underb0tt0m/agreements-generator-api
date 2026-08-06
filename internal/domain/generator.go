@@ -27,3 +27,13 @@ func IsJobStatus(status string) (JobStatus, error) {
 		return "", ErrInternal.Wrap(fmt.Sprint("unknown job status: ", status), nil)
 	}
 }
+
+type User struct {
+	Name     string
+	Login    string
+	Password []byte
+}
+
+type ContextKey string
+
+const LoginKey ContextKey = "login"
