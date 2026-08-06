@@ -16,6 +16,10 @@ func (e *AppErr) Error() string {
 	return e.Msg
 }
 
+func (e *AppErr) Unwrap() error {
+	return e.Err
+}
+
 func (e *AppErr) Wrap(msg string, err error) *AppErr {
 	newErr := *e
 	newErr.Err = err
@@ -25,13 +29,21 @@ func (e *AppErr) Wrap(msg string, err error) *AppErr {
 	return &newErr
 }
 
-func (e *AppErr) Is(target error) bool {
-	appErr, ok := errors.AsType[*AppErr](target)
-	if !ok {
-		return false
-	}
-	return e.Code == appErr.Code
-}
+//func (e *AppErr) Is(target error) bool {
+//	appErr, ok := errors.AsType[*AppErr](target)
+//	if !ok {
+//		return false
+//	}
+//	return e.Code == appErr.Code
+//}
+
+/*
+	эта функиця не нужна
+	глобально ошибки двух видов: ожидаемые и нет
+	проверять их нужно только в 1 месте - handler и там делать вывод, что отдать клиенту
+	1. Если ошибка твоя - то код и текст
+	2. Во всех остальных случаях 500/InternalServerError/Произошла непредвиденная ошибка
+*/
 
 func CheckAppErr(err error) *AppErr {
 	appErr, ok := errors.AsType[*AppErr](err)
@@ -46,31 +58,32 @@ var (
 		Msg:        "internal server error",
 		HTTPStatus: http.StatusInternalServerError,
 		Code:       1000,
-		Err:        nil,
 	}
+
 	ErrBadRequest = &AppErr{
 		Msg:        "bad request",
 		HTTPStatus: http.StatusBadRequest,
 		Code:       1001,
-		Err:        nil,
 	}
-
+	ErrTooLongReq = &AppErr{
+		Msg:        "архив слишком велик",
+		HTTPStatus: http.StatusBadRequest,
+		Code:       666,
+		Err:        ErrBadRequest,
+	}
 	ErrStorageBadRequest = &AppErr{
 		Msg:        "error during storage request",
 		HTTPStatus: http.StatusInternalServerError,
 		Code:       1002,
-		Err:        nil,
 	}
 	ErrNotFound = &AppErr{
 		Msg:        "source not found",
 		HTTPStatus: http.StatusNotFound,
 		Code:       1003,
-		Err:        nil,
 	}
 	ErrConflict = &AppErr{
 		Msg:        "conflict",
 		HTTPStatus: http.StatusConflict,
 		Code:       1004,
-		Err:        nil,
 	}
 )

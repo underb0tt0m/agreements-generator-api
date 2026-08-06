@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"agreements-generator/gen/go/generator"
+
 	"agreements-generator/internal/config"
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/logging"
@@ -15,15 +16,19 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// interface client 1.method GENDick() []byte, error
+
 type Generator struct {
 	grpcClient generator.GeneratorClient
-	conn       *grpc.ClientConn
-	log        logging.Logger
-	storage    storage.Storage
-	cfg        *config.Config
+	// сервису про коннект знать не надо, сюда нужен лишь интерфейс, который описывает требуемое поведение от клиента
+	conn    *grpc.ClientConn
+	log     logging.Logger
+	storage storage.Storage
+	cfg     *config.Config
 }
 
 func New(cfg *config.Config, l logging.Logger, s storage.Storage) (*Generator, error) {
+	// вся суета в инициализацией в main
 	URI := fmt.Sprintf("%s:%s", cfg.GRPCClient.Host, cfg.GRPCClient.Port)
 	conn, err := grpc.NewClient(URI, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -45,7 +50,7 @@ func (g *Generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 
 	id, err := uuid.NewUUID()
 	if err != nil {
-		return "", domain.ErrInternal.Wrap("can't create job", err)
+		return "", fmt.Errorf("can't create job: %w", err)
 	}
 
 	job := domain.Job{
@@ -54,7 +59,7 @@ func (g *Generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 	}
 
 	if err = g.storage.StoreJob(ctx, job); err != nil {
-		return "", domain.ErrInternal.Wrap("can't create job", err)
+		return "", fmt.Errorf("can't store job: %w", err)
 	}
 
 	g.log.Info("connecting to gRPC",
@@ -62,11 +67,11 @@ func (g *Generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 		"port", g.cfg.GRPCClient.Port,
 	)
 
-	jobCtx, cancel := context.WithTimeout(context.Background(), g.cfg.GRPCClient.JobMaxDuration)
-	go func() {
-		defer cancel()
-		g.grpcGenerate(jobCtx, &generator.GenerateRequest{Archive: archiveBytes}, job)
-	}()
+	jobCtx, cancel := context.WithTimeout(ctx, g.cfg.GRPCClient.JobMaxDuration)
+	defer cancel()
+
+	// эта функция тоже делает слишком много, в названии  тольео про грпц сказано
+	g.grpcGenerate(jobCtx, &generator.GenerateRequest{Archive: archiveBytes}, job)
 
 	return job.ID, nil
 }
@@ -95,6 +100,8 @@ func (g *Generator) GetArchiveInfo(ctx context.Context, jobID string) ([]*genera
 		return nil, 0, domain.CheckAppErr(err)
 	}
 
+	//
+
 	return genErrs, genCnt, nil
 }
 
@@ -103,8 +110,7 @@ func (g *Generator) Close() error {
 }
 
 func (g *Generator) grpcGenerate(ctx context.Context, request *generator.GenerateRequest, job domain.Job) {
-
-	response, err := g.grpcClient.Generate(ctx, request)
+	go response, err := g.grpcClient.Generate(ctx, request)
 	if err != nil {
 		g.log.Debug("error during grpc request", "error", err)
 		if err = g.storage.SaveResponse(

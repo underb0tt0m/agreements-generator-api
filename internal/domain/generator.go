@@ -15,6 +15,8 @@ const (
 	StatusFailed     JobStatus = "failed"
 )
 
+// в го функции вида Is... обычно возвращают true/false, тут лучше JobStatusFromString(s string) (JobStatus, error)
+
 func IsJobStatus(status string) (JobStatus, error) {
 	switch status {
 	case string(StatusProcessing):

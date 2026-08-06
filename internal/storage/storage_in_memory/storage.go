@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"agreements-generator/gen/go/generator"
+
 	"agreements-generator/internal/config"
 	"agreements-generator/internal/domain"
 )
@@ -22,7 +23,8 @@ type JobData struct {
 type MemoryStorage struct {
 	mu   sync.RWMutex
 	data map[string]*JobData
-	cfg  *config.Config
+	// если из конфига нужен только ттл, то только его и положить
+	cfg *config.Config
 }
 
 func NewMemoryStorage(cfg *config.Config) *MemoryStorage {
@@ -45,20 +47,26 @@ func (s *MemoryStorage) cleanupLoop() {
 func (s *MemoryStorage) cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	now := time.Now()
+
 	for id, job := range s.data {
-		if now.Sub(job.CreatedAt) > s.cfg.Storage.JobTTL {
+		if time.Since(job.CreatedAt) > s.cfg.Storage.JobTTL {
 			delete(s.data, id)
 		}
 	}
 }
 
-func (s *MemoryStorage) StoreJob(ctx context.Context, job domain.Job) error {
+func (s *MemoryStorage) StoreJob(_ context.Context, job domain.Job) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.data[job.ID]; exists {
 		return domain.ErrConflict.Wrap("job already exists", nil)
 	}
+
+	err := bd.Method()
+	if err != nil {
+		return err
+	}
+
 	s.data[job.ID] = &JobData{
 		Status:    job.Status,
 		CreatedAt: time.Now(),
@@ -113,6 +121,7 @@ func (s *MemoryStorage) GetArchive(ctx context.Context, jobID string) ([]byte, e
 	if !exists {
 		return nil, domain.ErrNotFound.Wrap("job not found", nil)
 	}
+	// все что ниже этого коммента это твоя бизнес-логика и она должна быть в сервисе. Роль хранилища это достать данные
 	if job.Status != domain.StatusCompleted {
 		return nil, domain.ErrBadRequest.Wrap("job not completed", nil)
 	}
@@ -129,6 +138,7 @@ func (s *MemoryStorage) GetArchiveInfo(ctx context.Context, jobID string) ([]*ge
 	if !exists {
 		return nil, 0, domain.ErrNotFound.Wrap("job not found", nil)
 	}
+	//
 	if job.Status != domain.StatusCompleted && job.Status != domain.StatusFailed {
 		return nil, 0, domain.ErrBadRequest.Wrap("job not finished", nil)
 	}

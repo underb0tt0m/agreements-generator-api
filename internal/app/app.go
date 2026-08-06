@@ -10,9 +10,9 @@ import (
 	"agreements-generator/internal/logging"
 	"agreements-generator/internal/service"
 	"agreements-generator/internal/storage/storage_in_memory"
-
-	"github.com/go-chi/chi/v5"
 )
+
+// этот пакет и эта сущность тебе ну нужны, все в main
 
 type App struct {
 	Server        *http.Server
