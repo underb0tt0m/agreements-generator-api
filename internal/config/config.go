@@ -9,12 +9,22 @@ import (
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
+type SigningMethod = string
+
+const (
+	HS256 = "HS256"
+	ES256 = "ES256"
+	RS256 = "RS256"
+)
+
 type Config struct {
 	Env        string     `yaml:"env" env-default:"production"`
 	Log        logger     `yaml:"logger"`
 	Server     server     `yaml:"server"`
 	GRPCClient gRPCClient `yaml:"grpc_client"`
 	Storage    storage    `yaml:"storage"`
+	JWT        jWT        `yaml:"jwt"`
+	Security   security   `yaml:"security"`
 }
 
 type logger struct {
@@ -36,6 +46,17 @@ type storage struct {
 	JobTTL time.Duration `yaml:"job_ttl" env-default:"5m"`
 }
 
+type security struct {
+	HashCost  int `yaml:"hash_cost" env-default:"10"`
+	SecretKey string
+}
+
+type jWT struct {
+	JWTSigningMethod SigningMethod `yaml:"jwt_signing_method" env-default:"HS256"`
+	TokenTTL         time.Duration `yaml:"token_ttl" env-default:"1h"`
+	Prefix           string        `yaml:"prefix" env-default:"Bearer"`
+}
+
 func Load() (*Config, error) {
 	cfgPath := fetchConfigPath()
 
@@ -51,6 +72,16 @@ func Load() (*Config, error) {
 	if err := cleanenv.ReadConfig(cfgPath, &cfg); err != nil {
 		return nil, fmt.Errorf("can't read config: %w", err)
 	}
+
+	secret, ok := os.LookupEnv("JWT_SECRET")
+	if !ok {
+		return nil, fmt.Errorf("JWT secret string is denied")
+	}
+	if secret == "" {
+		return nil, fmt.Errorf("JWT secret is empty")
+	}
+
+	cfg.Security.SecretKey = secret
 
 	return &cfg, nil
 }

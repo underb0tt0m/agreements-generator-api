@@ -19,11 +19,11 @@ type Generator struct {
 	grpcClient generator.GeneratorClient
 	conn       *grpc.ClientConn
 	log        logging.Logger
-	storage    storage.Storage
+	storage    storage.GeneratorStorage
 	cfg        *config.Config
 }
 
-func New(cfg *config.Config, l logging.Logger, s storage.Storage) (*Generator, error) {
+func NewGen(cfg *config.Config, l logging.Logger, s storage.GeneratorStorage) (*Generator, error) {
 	URI := fmt.Sprintf("%s:%s", cfg.GRPCClient.Host, cfg.GRPCClient.Port)
 	conn, err := grpc.NewClient(URI, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -106,7 +106,7 @@ func (g *Generator) grpcGenerate(ctx context.Context, request *generator.Generat
 
 	response, err := g.grpcClient.Generate(ctx, request)
 	if err != nil {
-		g.log.Debug("error during grpc request", "error", err)
+		g.log.Debug("error during grpc request", logging.FieldError, err)
 		if err = g.storage.SaveResponse(
 			ctx,
 			job.ID,
@@ -115,10 +115,10 @@ func (g *Generator) grpcGenerate(ctx context.Context, request *generator.Generat
 			0,
 			domain.ErrInternal.Wrap("can't execute grpc request", err),
 		); err != nil {
-			g.log.Error("failed to save response", "error", err)
+			g.log.Error("failed to save response", logging.FieldError, err)
 		}
 		if err = g.storage.UpdateJob(ctx, job.ID, domain.StatusFailed); err != nil {
-			g.log.Error("failed to update job status", "error", err)
+			g.log.Error("failed to update job status", logging.FieldError, err)
 		}
 		return
 	}
@@ -136,9 +136,9 @@ func (g *Generator) grpcGenerate(ctx context.Context, request *generator.Generat
 		int(response.GeneratedCount),
 		nil,
 	); err != nil {
-		g.log.Error("failed to save response", "error", err)
+		g.log.Error("failed to save response", logging.FieldError, err)
 	}
 	if err = g.storage.UpdateJob(ctx, job.ID, domain.StatusCompleted); err != nil {
-		g.log.Error("failed to update job status", "error", err)
+		g.log.Error("failed to update job status", logging.FieldError, err)
 	}
 }

@@ -73,4 +73,29 @@ var (
 		Code:       1004,
 		Err:        nil,
 	}
+	ErrUnprocessableEntity = &AppErr{
+		Msg:        "unprocessable entity",
+		HTTPStatus: http.StatusUnprocessableEntity,
+		Code:       1007,
+		Err:        nil,
+	}
+	ErrUnauthorized = &AppErr{
+		Msg:        "unauthorized",
+		HTTPStatus: http.StatusUnauthorized,
+		Code:       1008,
+		Err:        nil,
+	}
+
+	ErrWrongSigningMethod = &AppErr{
+		Msg:        "wrong signing method",
+		HTTPStatus: http.StatusUnauthorized,
+		Code:       1005,
+		Err:        nil,
+	}
+	ErrInvalidToken = &AppErr{
+		Msg:        "invalid or malformed token",
+		HTTPStatus: http.StatusUnauthorized,
+		Code:       1006,
+		Err:        nil,
+	}
 )

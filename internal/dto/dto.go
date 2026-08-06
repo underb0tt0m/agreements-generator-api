@@ -38,3 +38,18 @@ func NewGetArchiveInfoResponse(grpcErrs []*generator.FileErrors, genCnt int) *Ge
 		GenCnt:  genCnt,
 	}
 }
+
+type RegisterRequest struct {
+	Name     string `json:"name"`
+	Login    string `json:"login"`
+	Password string `json:"password"`
+}
+
+type LogInRequest struct {
+	Login    string `json:"login"`
+	Password string `json:"password"`
+}
+
+type AuthResponse struct {
+	Token string `json:"token"`
+}
