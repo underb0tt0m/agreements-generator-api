@@ -61,6 +61,12 @@ func (s *MemoryStorage) StoreJob(_ context.Context, job domain.Job) error {
 	if _, exists := s.data[job.ID]; exists {
 		return domain.ErrConflict.Wrap("job already exists", nil)
 	}
+
+	err := bd.Method()
+	if err != nil {
+		return err
+	}
+
 	s.data[job.ID] = &JobData{
 		Status:    job.Status,
 		CreatedAt: time.Now(),

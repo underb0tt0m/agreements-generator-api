@@ -175,17 +175,8 @@ func (h *API) writeResponse(w http.ResponseWriter, response []byte, responseType
 func (h *API) writeError(w http.ResponseWriter, err error) {
 	appErr, ok := errors.AsType[*domain.AppErr](err)
 	if !ok {
-		w.WriteHeader(domain.ErrInternal.HTTPStatus)
-
-		body := errorResponse{Details: domain.ErrInternal.Msg}
-		responseBytes, encodeErr := h.Encoder.Marshal(body)
-		if encodeErr != nil {
-			h.Log.Error("failed to encode error response body", "error", encodeErr)
-		}
-
-		if _, writeErr := w.Write(responseBytes); writeErr != nil {
-			h.Log.Error("failed to write error response body", "error", writeErr)
-		}
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("пиздец товарищи"))
 		return
 	}
 

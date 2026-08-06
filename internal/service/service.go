@@ -16,6 +16,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// interface client 1.method GENDick() []byte, error
+
 type Generator struct {
 	grpcClient generator.GeneratorClient
 	// сервису про коннект знать не надо, сюда нужен лишь интерфейс, который описывает требуемое поведение от клиента
@@ -48,7 +50,7 @@ func (g *Generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 
 	id, err := uuid.NewUUID()
 	if err != nil {
-		return "", domain.ErrInternal.Wrap("can't create job", err)
+		return "", fmt.Errorf("can't create job: %w", err)
 	}
 
 	job := domain.Job{
@@ -57,7 +59,7 @@ func (g *Generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 	}
 
 	if err = g.storage.StoreJob(ctx, job); err != nil {
-		return "", domain.ErrInternal.Wrap("can't create job", err)
+		return "", fmt.Errorf("can't store job: %w", err)
 	}
 
 	g.log.Info("connecting to gRPC",
@@ -98,6 +100,8 @@ func (g *Generator) GetArchiveInfo(ctx context.Context, jobID string) ([]*genera
 		return nil, 0, domain.CheckAppErr(err)
 	}
 
+	//
+
 	return genErrs, genCnt, nil
 }
 
@@ -106,7 +110,7 @@ func (g *Generator) Close() error {
 }
 
 func (g *Generator) grpcGenerate(ctx context.Context, request *generator.GenerateRequest, job domain.Job) {
-	response, err := g.grpcClient.Generate(ctx, request)
+	go response, err := g.grpcClient.Generate(ctx, request)
 	if err != nil {
 		g.log.Debug("error during grpc request", "error", err)
 		if err = g.storage.SaveResponse(

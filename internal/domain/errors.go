@@ -16,6 +16,10 @@ func (e *AppErr) Error() string {
 	return e.Msg
 }
 
+func (e *AppErr) Unwrap() error {
+	return e.Err
+}
+
 func (e *AppErr) Wrap(msg string, err error) *AppErr {
 	newErr := *e
 	newErr.Err = err
@@ -25,13 +29,13 @@ func (e *AppErr) Wrap(msg string, err error) *AppErr {
 	return &newErr
 }
 
-func (e *AppErr) Is(target error) bool {
-	appErr, ok := errors.AsType[*AppErr](target)
-	if !ok {
-		return false
-	}
-	return e.Code == appErr.Code
-}
+//func (e *AppErr) Is(target error) bool {
+//	appErr, ok := errors.AsType[*AppErr](target)
+//	if !ok {
+//		return false
+//	}
+//	return e.Code == appErr.Code
+//}
 
 /*
 	эта функиця не нужна
@@ -55,12 +59,18 @@ var (
 		HTTPStatus: http.StatusInternalServerError,
 		Code:       1000,
 	}
+
 	ErrBadRequest = &AppErr{
 		Msg:        "bad request",
 		HTTPStatus: http.StatusBadRequest,
 		Code:       1001,
 	}
-
+	ErrTooLongReq = &AppErr{
+		Msg:        "архив слишком велик",
+		HTTPStatus: http.StatusBadRequest,
+		Code:       666,
+		Err:        ErrBadRequest,
+	}
 	ErrStorageBadRequest = &AppErr{
 		Msg:        "error during storage request",
 		HTTPStatus: http.StatusInternalServerError,
