@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"agreements-generator/gen/go/generator"
 	"agreements-generator/internal/config"
 	"agreements-generator/internal/domain"
 )
@@ -13,7 +12,7 @@ import (
 type JobData struct {
 	Status     domain.JobStatus
 	Archive    []byte
-	Errors     []*generator.FileErrors
+	Errors     []domain.FilesErrors
 	GenCount   int
 	CreatedAt  time.Time
 	FatalError error
@@ -96,7 +95,7 @@ func (s *MemoryStorage) CheckJobStatus(ctx context.Context, id string) (string, 
 	return string(job.Status), nil
 }
 
-func (s *MemoryStorage) SaveResponse(ctx context.Context, jobID string, archive []byte, errs []*generator.FileErrors, genCnt int, err error) error {
+func (s *MemoryStorage) SaveResponse(ctx context.Context, jobID string, response *domain.GenResponse, err error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	job, exists := s.data[jobID]
@@ -109,9 +108,9 @@ func (s *MemoryStorage) SaveResponse(ctx context.Context, jobID string, archive 
 		job.Status = domain.StatusCompleted
 	}
 	job.FatalError = err
-	job.Archive = archive
-	job.Errors = errs
-	job.GenCount = genCnt
+	job.Archive = response.Archive
+	job.Errors = response.Errors
+	job.GenCount = response.GenCount
 	return nil
 }
 
@@ -131,7 +130,7 @@ func (s *MemoryStorage) GetArchive(ctx context.Context, jobID string) ([]byte, e
 	return job.Archive, nil
 }
 
-func (s *MemoryStorage) GetArchiveInfo(ctx context.Context, jobID string) ([]*generator.FileErrors, int, error) {
+func (s *MemoryStorage) GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	job, exists := s.data[jobID]

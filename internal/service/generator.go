@@ -2,39 +2,29 @@ package service
 
 import (
 	"context"
-	"fmt"
 
-	"agreements-generator/gen/go/generator"
 	"agreements-generator/internal/config"
 	"agreements-generator/internal/domain"
+	"agreements-generator/internal/gen_client"
 	"agreements-generator/internal/logging"
 	"agreements-generator/internal/storage"
 
 	"github.com/google/uuid"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Generator struct {
-	grpcClient generator.GeneratorClient
-	conn       *grpc.ClientConn
-	log        logging.Logger
-	storage    storage.GeneratorStorage
-	cfg        *config.Config
+	client  gen_client.GeneratorClient
+	log     logging.Logger
+	storage storage.GeneratorStorage
+	cfg     *config.Config
 }
 
-func NewGen(cfg *config.Config, l logging.Logger, s storage.GeneratorStorage) (*Generator, error) {
-	URI := fmt.Sprintf("%s:%s", cfg.GRPCClient.Host, cfg.GRPCClient.Port)
-	conn, err := grpc.NewClient(URI, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, fmt.Errorf("can't create GRPC Client: %w", err)
-	}
+func NewGen(cfg *config.Config, l logging.Logger, s storage.GeneratorStorage, client gen_client.GeneratorClient) (*Generator, error) {
 	return &Generator{
-		grpcClient: generator.NewGeneratorClient(conn),
-		conn:       conn,
-		log:        l,
-		storage:    s,
-		cfg:        cfg,
+		client:  client,
+		log:     l,
+		storage: s,
+		cfg:     cfg,
 	}, nil
 }
 
@@ -57,15 +47,54 @@ func (g *Generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 		return "", domain.ErrInternal.Wrap("can't create job", err)
 	}
 
-	g.log.Info("connecting to gRPC",
-		"host", g.cfg.GRPCClient.Host,
-		"port", g.cfg.GRPCClient.Port,
-	)
-
 	jobCtx, cancel := context.WithTimeout(context.Background(), g.cfg.GRPCClient.JobMaxDuration)
+	responseChan := make(chan *domain.GenResponse)
+	errChan := make(chan error)
 	go func() {
 		defer cancel()
-		g.grpcGenerate(jobCtx, &generator.GenerateRequest{Archive: archiveBytes}, job)
+		defer close(errChan)
+		defer close(responseChan)
+
+		g.log.Debug("connecting to gRPC",
+			"host", g.cfg.GRPCClient.Host,
+			"port", g.cfg.GRPCClient.Port,
+		)
+
+		go g.client.BulkGenerate(jobCtx, archiveBytes, responseChan, errChan)
+
+		g.log.Debug("waiting client's response")
+
+		err = <-errChan
+		response := <-responseChan
+
+		g.log.Debug("response has been received")
+
+		if err != nil {
+			if storageErr := g.storage.SaveResponse(jobCtx, job.ID, response, err); storageErr != nil {
+				g.log.Error("can't update job info", logging.FieldError, storageErr)
+			}
+
+			if storageErr := g.storage.UpdateJob(jobCtx, job.ID, domain.StatusFailed); storageErr != nil {
+				g.log.Error("job failed; can't update job status", logging.FieldError, storageErr)
+			}
+
+			return
+		}
+
+		if storageErr := g.storage.SaveResponse(jobCtx, job.ID, response, err); storageErr != nil {
+			g.log.Error("can't update job info", logging.FieldError, storageErr)
+
+			if storageErr = g.storage.UpdateJob(jobCtx, job.ID, domain.StatusFailed); storageErr != nil {
+				g.log.Error("can't update job status", logging.FieldError, storageErr)
+			}
+
+			return
+		}
+
+		if storageErr := g.storage.UpdateJob(jobCtx, job.ID, domain.StatusCompleted); storageErr != nil {
+			g.log.Error("can't update job status", logging.FieldError, storageErr)
+		}
+
 	}()
 
 	return job.ID, nil
@@ -89,56 +118,11 @@ func (g *Generator) GetArchive(ctx context.Context, jobID string) ([]byte, error
 	return archive, nil
 }
 
-func (g *Generator) GetArchiveInfo(ctx context.Context, jobID string) ([]*generator.FileErrors, int, error) {
+func (g *Generator) GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error) {
 	genErrs, genCnt, err := g.storage.GetArchiveInfo(ctx, jobID)
 	if err != nil {
 		return nil, 0, domain.CheckAppErr(err)
 	}
 
 	return genErrs, genCnt, nil
-}
-
-func (g *Generator) Close() error {
-	return g.conn.Close()
-}
-
-func (g *Generator) grpcGenerate(ctx context.Context, request *generator.GenerateRequest, job domain.Job) {
-
-	response, err := g.grpcClient.Generate(ctx, request)
-	if err != nil {
-		g.log.Debug("error during grpc request", logging.FieldError, err)
-		if err = g.storage.SaveResponse(
-			ctx,
-			job.ID,
-			nil,
-			[]*generator.FileErrors{},
-			0,
-			domain.ErrInternal.Wrap("can't execute grpc request", err),
-		); err != nil {
-			g.log.Error("failed to save response", logging.FieldError, err)
-		}
-		if err = g.storage.UpdateJob(ctx, job.ID, domain.StatusFailed); err != nil {
-			g.log.Error("failed to update job status", logging.FieldError, err)
-		}
-		return
-	}
-	g.log.Debug("gRPC response received",
-		"zip_size", len(response.ZipArchive),
-		"errors_count", len(response.Errors),
-		"generated_count", response.GeneratedCount,
-	)
-
-	if err = g.storage.SaveResponse(
-		ctx,
-		job.ID,
-		response.ZipArchive,
-		response.Errors,
-		int(response.GeneratedCount),
-		nil,
-	); err != nil {
-		g.log.Error("failed to save response", logging.FieldError, err)
-	}
-	if err = g.storage.UpdateJob(ctx, job.ID, domain.StatusCompleted); err != nil {
-		g.log.Error("failed to update job status", logging.FieldError, err)
-	}
 }

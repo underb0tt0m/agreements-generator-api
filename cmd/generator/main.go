@@ -3,14 +3,26 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
-	"agreements-generator/internal/app"
+	"agreements-generator/gen/go/generator"
+	"agreements-generator/internal/api/api_v1"
 	"agreements-generator/internal/config"
+	"agreements-generator/internal/encoder/encoder_json"
+	"agreements-generator/internal/gen_client"
+	"agreements-generator/internal/hasher"
 	"agreements-generator/internal/logging"
+	"agreements-generator/internal/service"
+	"agreements-generator/internal/storage/storage_in_memory"
+	"agreements-generator/internal/token_manager"
+
+	"github.com/go-chi/chi/v5"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -26,13 +38,55 @@ func main() {
 		os.Exit(1)
 	}
 
-	//	app init
-	genApp, err := app.New(cfg, logger)
+	appStorage := storage_in_memory.NewMemoryStorage(cfg)
+
+	encoder := encoder_json.New()
+	hashEr := hasher.New(cfg.Security.HashCost)
+	tokenMng := token_manager.New(
+		logger,
+		encoder,
+		cfg.JWT.TokenTTL,
+		cfg.JWT.JWTSigningMethod,
+		cfg.Security.SecretKey,
+		cfg.JWT.Prefix,
+	)
+
+	URI := fmt.Sprintf("%s:%s", cfg.GRPCClient.Host, cfg.GRPCClient.Port)
+	conn, err := grpc.NewClient(URI, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		fmt.Printf("init http server: %v", err)
-		os.Exit(1)
+		logger.Error("can't create GRPC Client", logging.FieldError, err)
 	}
-	defer genApp.CloseGRPCConn()
+
+	genClient := gen_client.New(generator.NewGeneratorClient(conn), conn, logger)
+	defer genClient.Close()
+
+	gen, err := service.NewGen(cfg, logger, appStorage, genClient)
+	if err != nil {
+		logger.Fatal("can't init service layer", logging.FieldError, err)
+	}
+	auth := service.NewAuth(appStorage, tokenMng, hashEr)
+
+	genHandler := api_v1.API{
+		Log:     logger,
+		Cfg:     cfg,
+		Service: gen,
+		Encoder: encoder,
+	}
+	authHandler := api_v1.Auth{
+		Encoder: encoder,
+		Log:     logger,
+		Service: auth,
+	}
+
+	router := chi.NewRouter()
+
+	genHandler.RegisterRoutes(router, tokenMng)
+	authHandler.RegisterRoutes(router)
+
+	APIServer := &http.Server{
+		Addr:    fmt.Sprintf(":%s", cfg.Server.Port),
+		Handler: router,
+	}
 
 	wg := sync.WaitGroup{}
 	stop := make(chan os.Signal, 1)
@@ -42,7 +96,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		logger.Info(fmt.Sprintf("starting http server on port: %s...", cfg.Server.Port))
-		genApp.Server.ListenAndServe()
+		APIServer.ListenAndServe()
 	}()
 
 	wg.Add(1)
@@ -56,7 +110,7 @@ func main() {
 			cfg.Server.ShutdownDuration)
 		defer cancel()
 
-		if err = genApp.Server.Shutdown(shutDownCtx); err != nil {
+		if err = APIServer.Shutdown(shutDownCtx); err != nil {
 			logger.Error(fmt.Sprintf("can't stop server gracefully: %v", err))
 			return
 		}

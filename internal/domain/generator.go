@@ -1,6 +1,8 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Job struct {
 	ID     string
@@ -37,3 +39,19 @@ type User struct {
 type ContextKey string
 
 const LoginKey ContextKey = "login"
+
+type GenResponse struct {
+	Archive  []byte
+	Errors   []FilesErrors
+	GenCount int
+}
+
+type FilesErrors struct {
+	Name   string
+	Errors []FileError
+}
+
+type FileError struct {
+	Code int
+	Msg  string
+}

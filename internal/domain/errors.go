@@ -98,4 +98,11 @@ var (
 		Code:       1006,
 		Err:        nil,
 	}
+
+	ErrGenClient = &AppErr{
+		Msg:        "error during generation",
+		HTTPStatus: http.StatusInternalServerError,
+		Code:       1009,
+		Err:        ErrInternal,
+	}
 )
