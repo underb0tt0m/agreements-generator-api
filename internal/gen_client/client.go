@@ -5,7 +5,7 @@ import (
 
 	"agreements-generator/gen/go/generator"
 	"agreements-generator/internal/domain"
-	"agreements-generator/internal/logging"
+	"agreements-generator/internal/logger"
 
 	"google.golang.org/grpc"
 )
@@ -15,14 +15,14 @@ type GeneratorClient interface {
 	Close() error
 }
 
-func New(grpcClient generator.GeneratorClient, conn *grpc.ClientConn, logger logging.Logger) GeneratorClient {
+func New(grpcClient generator.GeneratorClient, conn *grpc.ClientConn, logger logger.Logger) GeneratorClient {
 	return &client{grpcClient: grpcClient, conn: conn, logger: logger}
 }
 
 type client struct {
 	grpcClient generator.GeneratorClient
 	conn       *grpc.ClientConn
-	logger     logging.Logger
+	logger     logger.Logger
 }
 
 func (c *client) BulkGenerate(
@@ -33,7 +33,7 @@ func (c *client) BulkGenerate(
 ) {
 	response, err := c.grpcClient.Generate(ctx, &generator.GenerateRequest{Archive: archive})
 	if err != nil {
-		c.logger.Debug("can't get grpcs response", logging.FieldError, err)
+		c.logger.Debug("can't get grpcs response", logger.FieldError, err)
 		responseChan <- &domain.GenResponse{}
 		errChan <- domain.ErrGenClient
 		return

@@ -7,11 +7,11 @@ import (
 )
 
 type GeneratorStorage interface {
-	GetArchive(ctx context.Context, jobID string) ([]byte, error)
-	GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error)
-	SaveResponse(ctx context.Context, jobID string, response *domain.GenResponse, err error) error
+	GetArchive(ctx context.Context, jobID string) (string, []byte, error)
+	GetArchiveInfo(ctx context.Context, jobID string) (string, []domain.FilesErrors, int, error)
+	SaveResponse(ctx context.Context, job domain.Job, response *domain.GenResponse, err error) error
 	StoreJob(ctx context.Context, job domain.Job) error
-	UpdateJob(ctx context.Context, id string, status domain.JobStatus) error
+	UpdateJob(ctx context.Context, job domain.Job) error
 	CheckJobStatus(ctx context.Context, id string) (string, error)
 }
 

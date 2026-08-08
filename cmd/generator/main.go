@@ -15,7 +15,7 @@ import (
 	"agreements-generator/internal/encoder/encoder_json"
 	"agreements-generator/internal/gen_client"
 	"agreements-generator/internal/hasher"
-	"agreements-generator/internal/logging"
+	loggerModule "agreements-generator/internal/logger"
 	"agreements-generator/internal/service"
 	"agreements-generator/internal/storage/storage_in_memory"
 	"agreements-generator/internal/token_manager"
@@ -32,7 +32,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger, err := logging.Load(cfg)
+	logger, err := loggerModule.Load(cfg)
 	if err != nil {
 		fmt.Printf("can't init logger: %v", err)
 		os.Exit(1)
@@ -54,7 +54,7 @@ func main() {
 	URI := fmt.Sprintf("%s:%s", cfg.GRPCClient.Host, cfg.GRPCClient.Port)
 	conn, err := grpc.NewClient(URI, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Error("can't create GRPC Client", logging.FieldError, err)
+		logger.Error("can't create GRPC Client", loggerModule.FieldError, err)
 	}
 
 	genClient := gen_client.New(generator.NewGeneratorClient(conn), conn, logger)
@@ -62,7 +62,7 @@ func main() {
 
 	gen, err := service.NewGen(cfg, logger, appStorage, genClient)
 	if err != nil {
-		logger.Fatal("can't init service layer", logging.FieldError, err)
+		logger.Fatal("can't init service layer", loggerModule.FieldError, err)
 	}
 	auth := service.NewAuth(appStorage, tokenMng, hashEr)
 

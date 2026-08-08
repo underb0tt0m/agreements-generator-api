@@ -17,7 +17,7 @@ const (
 	StatusFailed     JobStatus = "failed"
 )
 
-func IsJobStatus(status string) (JobStatus, error) {
+func JobStatusFromString(status string) (JobStatus, error) {
 	switch status {
 	case string(StatusProcessing):
 		return StatusProcessing, nil

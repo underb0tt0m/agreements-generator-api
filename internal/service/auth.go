@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/dto"
@@ -35,7 +36,7 @@ func (a *Auth) Register(ctx context.Context, userData dto.RegisterRequest) (stri
 
 	hashedPassword, err := a.hasher.Hash(userData.Password)
 	if err != nil {
-		return "", domain.CheckAppErr(err)
+		return "", fmt.Errorf("can't hash password of user with login %s: %w", userData.Login, err)
 	}
 
 	user := domain.User{
@@ -45,12 +46,12 @@ func (a *Auth) Register(ctx context.Context, userData dto.RegisterRequest) (stri
 	}
 
 	if err = a.storage.Register(ctx, user); err != nil {
-		return "", domain.CheckAppErr(err)
+		return "", fmt.Errorf("can't register user with login %s: %w", user.Login, err)
 	}
 
 	token, err := a.tokenMng.Create(token_manager.UserClaims{Login: user.Login})
 	if err != nil {
-		return "", domain.CheckAppErr(err)
+		return "", fmt.Errorf("can't create token for user with login %s: %w", user.Login, err)
 	}
 
 	return token, nil
@@ -59,17 +60,17 @@ func (a *Auth) Register(ctx context.Context, userData dto.RegisterRequest) (stri
 func (a *Auth) LogIn(ctx context.Context, userData dto.LogInRequest) (string, error) {
 	hashedPassword, err := a.storage.LogIn(ctx, userData.Login)
 	if err != nil {
-		return "", domain.CheckAppErr(err)
+		return "", fmt.Errorf("can't get password of user with login %s: %w", userData.Login, err)
 	}
 
 	err = a.hasher.Compare(hashedPassword, userData.Password)
 	if err != nil {
-		return "", domain.CheckAppErr(err)
+		return "", fmt.Errorf("error during comparing passwords of user with login %s: %w", userData.Login, err)
 	}
 
 	token, err := a.tokenMng.Create(token_manager.UserClaims{Login: userData.Login})
 	if err != nil {
-		return "", domain.CheckAppErr(err)
+		return "", fmt.Errorf("can't create token for user with login %s: %w", userData.Login, err)
 	}
 
 	return token, nil

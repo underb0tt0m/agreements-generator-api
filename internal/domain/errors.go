@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"net/http"
 )
 
@@ -16,6 +15,7 @@ func (e *AppErr) Error() string {
 	return e.Msg
 }
 
+// unwrap the raw error (wrapped only once per architecture rule)
 func (e *AppErr) Wrap(msg string, err error) *AppErr {
 	newErr := *e
 	newErr.Err = err
@@ -25,20 +25,8 @@ func (e *AppErr) Wrap(msg string, err error) *AppErr {
 	return &newErr
 }
 
-func (e *AppErr) Is(target error) bool {
-	appErr, ok := errors.AsType[*AppErr](target)
-	if !ok {
-		return false
-	}
-	return e.Code == appErr.Code
-}
-
-func CheckAppErr(err error) *AppErr {
-	appErr, ok := errors.AsType[*AppErr](err)
-	if !ok {
-		return ErrStorageBadRequest.Wrap("bad storage request", err)
-	}
-	return appErr
+func (e *AppErr) Unwrap() error {
+	return e.Err
 }
 
 var (

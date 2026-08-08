@@ -6,7 +6,7 @@ import (
 	"agreements-generator/internal/config"
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/encoder"
-	"agreements-generator/internal/logging"
+	"agreements-generator/internal/logger"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -19,7 +19,7 @@ type TokenManager interface {
 }
 
 type tokenMaker struct {
-	logger        logging.Logger
+	logger        logger.Logger
 	encoder       encoder.Encoder
 	ttl           time.Duration
 	signingMethod jwt.SigningMethod
@@ -27,7 +27,7 @@ type tokenMaker struct {
 	prefix        string
 }
 
-func New(l logging.Logger, e encoder.Encoder, ttl time.Duration, signM string, secret string, prefix string) TokenManager {
+func New(l logger.Logger, e encoder.Encoder, ttl time.Duration, signM string, secret string, prefix string) TokenManager {
 	var method jwt.SigningMethod
 	switch signM {
 	case config.ES256:
@@ -57,12 +57,12 @@ type UserClaims struct {
 func (t *tokenMaker) Create(data any) (string, error) {
 	bytes, err := t.encoder.Marshal(data)
 	if err != nil {
-		return "", domain.ErrInternal.Wrap("can't marshal token data", err)
+		return "", err
 	}
 
 	claims := jwt.MapClaims{}
 	if err = t.encoder.Unmarshal(bytes, &claims); err != nil {
-		return "", domain.ErrInternal.Wrap("can't unmarshal token data into claims", err)
+		return "", err
 	}
 
 	claims["iat"] = jwt.NewNumericDate(time.Now())
@@ -71,8 +71,8 @@ func (t *tokenMaker) Create(data any) (string, error) {
 	token := jwt.NewWithClaims(t.signingMethod, claims)
 	signedToken, err := token.SignedString(t.secret)
 	if err != nil {
-		t.logger.Debug("can't sign token", logging.FieldError, err)
-		return "", domain.ErrInternal.Wrap("can't sign token", err)
+		t.logger.Debug("can't sign token", logger.FieldError, err)
+		return "", err
 	}
 
 	return signedToken, nil
@@ -81,7 +81,7 @@ func (t *tokenMaker) Create(data any) (string, error) {
 func (t *tokenMaker) Validate(tokenString string) error {
 	_, err := jwt.Parse(tokenString, t.createKeyFunc(t.secret))
 	if err != nil {
-		return domain.ErrInvalidToken
+		return domain.ErrInvalidToken.Wrap("", err)
 	}
 
 	return nil
@@ -90,21 +90,21 @@ func (t *tokenMaker) Validate(tokenString string) error {
 func (t *tokenMaker) Parse(tokenString string, obj interface{}) error {
 	token, err := jwt.Parse(tokenString, t.createKeyFunc(t.secret))
 	if err != nil {
-		return domain.ErrInvalidToken.Wrap("can't parse token into token object", err)
+		return domain.ErrInvalidToken.Wrap("", err)
 	}
 
 	if !token.Valid {
-		return domain.ErrInvalidToken.Wrap("token is invalid", nil)
+		return domain.ErrInvalidToken
 	}
 
 	bytes, err := t.encoder.Marshal(token.Claims)
 	if err != nil {
-		return domain.ErrInternal.Wrap("can't marshal token", err)
+		return err
 	}
 
 	if err = t.encoder.Unmarshal(bytes, obj); err != nil {
-		t.logger.Debug("can't parse token into input object", logging.FieldError, err)
-		return domain.ErrInvalidToken.Wrap("can't parse token into input object", err)
+		t.logger.Debug("can't parse token into input object", logger.FieldError, err)
+		return domain.ErrInvalidToken.Wrap("", err)
 	}
 
 	return nil

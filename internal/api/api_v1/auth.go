@@ -7,7 +7,7 @@ import (
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/dto"
 	"agreements-generator/internal/encoder"
-	"agreements-generator/internal/logging"
+	"agreements-generator/internal/logger"
 	"agreements-generator/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -15,19 +15,15 @@ import (
 
 type Auth struct {
 	Encoder encoder.Encoder
-	Log     logging.Logger
+	Log     logger.Logger
 	Service *service.Auth
 }
 
 func (a *Auth) RegisterRoutes(r chi.Router) {
 	r.Route("/auth", func(r chi.Router) {
-		a.Register(r)
-		a.LogIn(r)
+		r.Post("/register", a.handleRegister)
+		r.Get("/login", a.handleLogIn)
 	})
-}
-
-func (a *Auth) Register(r chi.Router) {
-	r.Post("/register", a.handleRegister)
 }
 
 func (a *Auth) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -58,10 +54,6 @@ func (a *Auth) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponse(w, response, responseJSON, a.Encoder, a.Log)
-}
-
-func (a *Auth) LogIn(r chi.Router) {
-	r.Get("/login", a.handleLogIn)
 }
 
 func (a *Auth) handleLogIn(w http.ResponseWriter, r *http.Request) {
