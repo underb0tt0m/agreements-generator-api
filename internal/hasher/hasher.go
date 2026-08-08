@@ -22,7 +22,7 @@ func New(cost int) Hasher {
 func (h *hasher) Hash(data string) ([]byte, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(data), h.cost)
 	if err != nil {
-		return nil, domain.ErrInternal.Wrap("can't hash string", err)
+		return nil, domain.ErrInternal.Wrap("", err)
 	}
 
 	return hash, nil
@@ -30,7 +30,7 @@ func (h *hasher) Hash(data string) ([]byte, error) {
 
 func (h *hasher) Compare(hash []byte, data string) error {
 	if err := bcrypt.CompareHashAndPassword(hash, []byte(data)); err != nil {
-		return domain.ErrUnauthorized.Wrap("invalid password", err)
+		return domain.ErrUnauthorized.Wrap("wrong login or password", err)
 	}
 	return nil
 }

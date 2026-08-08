@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"agreements-generator/gen/go/generator"
 	"agreements-generator/internal/config"
 	"agreements-generator/internal/domain"
 )
@@ -13,7 +12,7 @@ import (
 type JobData struct {
 	Status     domain.JobStatus
 	Archive    []byte
-	Errors     []*generator.FileErrors
+	Errors     []domain.FilesErrors
 	GenCount   int
 	CreatedAt  time.Time
 	FatalError error
@@ -54,15 +53,14 @@ func (s *MemoryStorage) cleanupLoop() {
 func (s *MemoryStorage) cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	now := time.Now()
 	for id, job := range s.data {
-		if now.Sub(job.CreatedAt) > s.cfg.Storage.JobTTL {
+		if time.Since(job.CreatedAt) > s.cfg.Storage.JobTTL {
 			delete(s.data, id)
 		}
 	}
 }
 
-func (s *MemoryStorage) StoreJob(ctx context.Context, job domain.Job) error {
+func (s *MemoryStorage) StoreJob(_ context.Context, job domain.Job) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.data[job.ID]; exists {
@@ -75,18 +73,18 @@ func (s *MemoryStorage) StoreJob(ctx context.Context, job domain.Job) error {
 	return nil
 }
 
-func (s *MemoryStorage) UpdateJob(ctx context.Context, id string, status domain.JobStatus) error {
+func (s *MemoryStorage) UpdateJob(_ context.Context, job domain.Job) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	job, exists := s.data[id]
+	jobData, exists := s.data[job.ID]
 	if !exists {
 		return domain.ErrNotFound.Wrap("job not found", nil)
 	}
-	job.Status = status
+	jobData.Status = job.Status
 	return nil
 }
 
-func (s *MemoryStorage) CheckJobStatus(ctx context.Context, id string) (string, error) {
+func (s *MemoryStorage) CheckJobStatus(_ context.Context, id string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	job, exists := s.data[id]
@@ -96,10 +94,10 @@ func (s *MemoryStorage) CheckJobStatus(ctx context.Context, id string) (string, 
 	return string(job.Status), nil
 }
 
-func (s *MemoryStorage) SaveResponse(ctx context.Context, jobID string, archive []byte, errs []*generator.FileErrors, genCnt int, err error) error {
+func (s *MemoryStorage) SaveResponse(_ context.Context, job domain.Job, response *domain.GenResponse, err error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	job, exists := s.data[jobID]
+	jobData, exists := s.data[job.ID]
 	if !exists {
 		return domain.ErrNotFound.Wrap("job not found", nil)
 	}
@@ -108,43 +106,36 @@ func (s *MemoryStorage) SaveResponse(ctx context.Context, jobID string, archive 
 	} else {
 		job.Status = domain.StatusCompleted
 	}
-	job.FatalError = err
-	job.Archive = archive
-	job.Errors = errs
-	job.GenCount = genCnt
+	jobData.FatalError = err
+	jobData.Archive = response.Archive
+	jobData.Errors = response.Errors
+	jobData.GenCount = response.GenCount
 	return nil
 }
 
-func (s *MemoryStorage) GetArchive(ctx context.Context, jobID string) ([]byte, error) {
+func (s *MemoryStorage) GetArchive(_ context.Context, jobID string) (string, []byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	job, exists := s.data[jobID]
 	if !exists {
-		return nil, domain.ErrNotFound.Wrap("job not found", nil)
+		return "", nil, domain.ErrNotFound.Wrap("job not found", nil)
 	}
-	if job.Status != domain.StatusCompleted {
-		return nil, domain.ErrBadRequest.Wrap("job not completed", nil)
-	}
-	if job.Archive == nil {
-		return nil, domain.ErrNotFound.Wrap("archive not found", nil)
-	}
-	return job.Archive, nil
+
+	return string(job.Status), job.Archive, nil
 }
 
-func (s *MemoryStorage) GetArchiveInfo(ctx context.Context, jobID string) ([]*generator.FileErrors, int, error) {
+func (s *MemoryStorage) GetArchiveInfo(_ context.Context, jobID string) (string, []domain.FilesErrors, int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	job, exists := s.data[jobID]
 	if !exists {
-		return nil, 0, domain.ErrNotFound.Wrap("job not found", nil)
+		return "", nil, 0, domain.ErrNotFound.Wrap("job not found", nil)
 	}
-	if job.Status != domain.StatusCompleted && job.Status != domain.StatusFailed {
-		return nil, 0, domain.ErrBadRequest.Wrap("job not finished", nil)
-	}
-	return job.Errors, job.GenCount, nil
+
+	return string(job.Status), job.Errors, job.GenCount, nil
 }
 
-func (s *MemoryStorage) Register(ctx context.Context, user domain.User) error {
+func (s *MemoryStorage) Register(_ context.Context, user domain.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -160,7 +151,7 @@ func (s *MemoryStorage) Register(ctx context.Context, user domain.User) error {
 	return nil
 }
 
-func (s *MemoryStorage) LogIn(ctx context.Context, login string) ([]byte, error) {
+func (s *MemoryStorage) LogIn(_ context.Context, login string) ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

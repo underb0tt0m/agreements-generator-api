@@ -1,6 +1,8 @@
 package dto
 
-import "agreements-generator/gen/go/generator"
+import (
+	"agreements-generator/internal/domain"
+)
 
 type BulkGenerateResponse struct {
 	JobID string `json:"job_id"`
@@ -21,15 +23,15 @@ type FilesErrors struct {
 	Errors   []string `json:"errors"`
 }
 
-func NewGetArchiveInfoResponse(grpcErrs []*generator.FileErrors, genCnt int) *GetArchiveInfoResponse {
+func NewGetArchiveInfoResponse(grpcErrs []domain.FilesErrors, genCnt int) *GetArchiveInfoResponse {
 	httpErrs := make([]FilesErrors, 0, len(grpcErrs))
 	for _, fileErrs := range grpcErrs {
 		errs := make([]string, 0, len(fileErrs.Errors))
 		for _, err := range fileErrs.Errors {
-			errs = append(errs, err.Message)
+			errs = append(errs, err.Msg)
 		}
 		httpErrs = append(httpErrs, FilesErrors{
-			FileName: fileErrs.FileName,
+			FileName: fileErrs.Name,
 			Errors:   errs,
 		})
 	}

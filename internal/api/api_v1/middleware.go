@@ -7,7 +7,7 @@ import (
 
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/encoder"
-	"agreements-generator/internal/logging"
+	"agreements-generator/internal/logger"
 	"agreements-generator/internal/token_manager"
 )
 
@@ -15,7 +15,7 @@ type user struct {
 	Login string `yaml:"login"`
 }
 
-func MWAuth(tokenMaker token_manager.TokenManager, enc encoder.Encoder, log logging.Logger) func(next http.Handler) http.Handler {
+func MWAuth(tokenMaker token_manager.TokenManager, enc encoder.Encoder, log logger.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			rawToken := r.Header.Get("Authorization")
@@ -32,14 +32,14 @@ func MWAuth(tokenMaker token_manager.TokenManager, enc encoder.Encoder, log logg
 
 			token = strings.TrimSpace(token)
 			if err := tokenMaker.Validate(token); err != nil {
-				log.Debug("validation is failed", logging.FieldError, err)
+				log.Debug("validation is failed", logger.FieldError, err)
 				writeError(w, domain.ErrUnauthorized.Wrap("invalid token", nil), enc, log)
 				return
 			}
 
 			usr := user{}
 			if err := tokenMaker.Parse(token, &usr); err != nil {
-				log.Debug("can't parse token", logging.FieldError, err)
+				log.Debug("can't parse token", logger.FieldError, err)
 				writeError(w, domain.ErrUnauthorized.Wrap("invalid token", nil), enc, log)
 				return
 			}

@@ -1,6 +1,8 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Job struct {
 	ID     string
@@ -15,7 +17,7 @@ const (
 	StatusFailed     JobStatus = "failed"
 )
 
-func IsJobStatus(status string) (JobStatus, error) {
+func JobStatusFromString(status string) (JobStatus, error) {
 	switch status {
 	case string(StatusProcessing):
 		return StatusProcessing, nil
@@ -37,3 +39,19 @@ type User struct {
 type ContextKey string
 
 const LoginKey ContextKey = "login"
+
+type GenResponse struct {
+	Archive  []byte
+	Errors   []FilesErrors
+	GenCount int
+}
+
+type FilesErrors struct {
+	Name   string
+	Errors []FileError
+}
+
+type FileError struct {
+	Code int
+	Msg  string
+}
