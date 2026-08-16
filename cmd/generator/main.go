@@ -60,7 +60,14 @@ func main() {
 	genClient := gen_client.New(generator.NewGeneratorClient(conn), conn, logger)
 	defer genClient.Close()
 
-	gen, err := service.NewGen(cfg, logger, appStorage, genClient)
+	gen, err := service.NewGen(
+		logger,
+		appStorage,
+		genClient,
+		cfg.GRPCClient.Host,
+		cfg.GRPCClient.Port,
+		cfg.GRPCClient.JobMaxDuration,
+	)
 	if err != nil {
 		logger.Fatal("can't init service layer", loggerModule.FieldError, err)
 	}

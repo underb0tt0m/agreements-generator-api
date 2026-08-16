@@ -6,6 +6,7 @@ import (
 	"agreements-generator/internal/domain"
 )
 
+//go:generate mockgen -source=storage.go -destination=../mocks/storage.go -package=mocks
 type GeneratorStorage interface {
 	GetArchive(ctx context.Context, jobID string) (string, []byte, error)
 	GetArchiveInfo(ctx context.Context, jobID string) (string, []domain.FilesErrors, int, error)

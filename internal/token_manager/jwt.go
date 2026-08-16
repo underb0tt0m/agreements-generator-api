@@ -1,6 +1,7 @@
 package token_manager
 
 import (
+	"fmt"
 	"time"
 
 	"agreements-generator/internal/config"
@@ -11,6 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+//go:generate mockgen -source=jwt.go -destination=../mocks/jwt.go -package=mocks
 type TokenManager interface {
 	Create(data any) (string, error)
 	Validate(token string) error
@@ -37,6 +39,7 @@ func New(l logger.Logger, e encoder.Encoder, ttl time.Duration, signM string, se
 	case config.RS256:
 		method = jwt.SigningMethodRS256
 	default:
+		l.Warn(fmt.Sprintf("unknown signing method %s, use default HS256", signM))
 		method = jwt.SigningMethodHS256
 	}
 
@@ -57,12 +60,12 @@ type UserClaims struct {
 func (t *tokenMaker) Create(data any) (string, error) {
 	bytes, err := t.encoder.Marshal(data)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("can't marshal data: %v, %w", err, domain.ErrInternal)
 	}
 
 	claims := jwt.MapClaims{}
 	if err = t.encoder.Unmarshal(bytes, &claims); err != nil {
-		return "", err
+		return "", fmt.Errorf("can't unmarshal data: %v, %w", err, domain.ErrInternal)
 	}
 
 	claims["iat"] = jwt.NewNumericDate(time.Now())
@@ -72,7 +75,7 @@ func (t *tokenMaker) Create(data any) (string, error) {
 	signedToken, err := token.SignedString(t.secret)
 	if err != nil {
 		t.logger.Debug("can't sign token", logger.FieldError, err)
-		return "", err
+		return "", fmt.Errorf("can't sign token: %v, %w", err, domain.ErrInternal)
 	}
 
 	return signedToken, nil
@@ -81,7 +84,7 @@ func (t *tokenMaker) Create(data any) (string, error) {
 func (t *tokenMaker) Validate(tokenString string) error {
 	_, err := jwt.Parse(tokenString, t.createKeyFunc(t.secret))
 	if err != nil {
-		return domain.ErrInvalidToken.Wrap("", err)
+		return fmt.Errorf("invalid token: %v, %w", err, domain.ErrInvalidToken)
 	}
 
 	return nil
@@ -90,7 +93,7 @@ func (t *tokenMaker) Validate(tokenString string) error {
 func (t *tokenMaker) Parse(tokenString string, obj interface{}) error {
 	token, err := jwt.Parse(tokenString, t.createKeyFunc(t.secret))
 	if err != nil {
-		return domain.ErrInvalidToken.Wrap("", err)
+		return fmt.Errorf("invalid token: %v, %w", err, domain.ErrInvalidToken)
 	}
 
 	if !token.Valid {
@@ -104,7 +107,7 @@ func (t *tokenMaker) Parse(tokenString string, obj interface{}) error {
 
 	if err = t.encoder.Unmarshal(bytes, obj); err != nil {
 		t.logger.Debug("can't parse token into input object", logger.FieldError, err)
-		return domain.ErrInvalidToken.Wrap("", err)
+		return fmt.Errorf("invalid token: %v, %w", err, domain.ErrInvalidToken)
 	}
 
 	return nil

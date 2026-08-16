@@ -2,6 +2,7 @@ package api_v1
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -70,7 +71,12 @@ func (h *API) handleBulkGenerate(w http.ResponseWriter, r *http.Request) {
 	responseBytes, err := h.Encoder.Marshal(responseDTO)
 	if err != nil {
 		h.Log.Error("failed to encode response body", err)
-		writeError(w, domain.ErrInternal.Wrap("failed to encode response body", nil), h.Encoder, h.Log)
+		writeError(
+			w,
+			fmt.Errorf("failed to encode response body: %v, %w", err, domain.ErrInternal),
+			h.Encoder,
+			h.Log,
+		)
 		return
 	}
 
@@ -82,10 +88,7 @@ func (h *API) handleGetJobStatus(w http.ResponseWriter, r *http.Request) {
 	if id == "" {
 		writeError(
 			w,
-			domain.ErrBadRequest.Wrap(
-				"query parameter ID is empty",
-				nil,
-			),
+			fmt.Errorf("query parameter ID is empty: %w", domain.ErrBadRequest),
 			h.Encoder,
 			h.Log,
 		)
@@ -106,7 +109,12 @@ func (h *API) handleGetJobStatus(w http.ResponseWriter, r *http.Request) {
 	responseBytes, err := h.Encoder.Marshal(responseDTO)
 	if err != nil {
 		h.Log.Error("failed to encode response body", err)
-		writeError(w, domain.ErrInternal.Wrap("failed to encode response body", nil), h.Encoder, h.Log)
+		writeError(
+			w,
+			fmt.Errorf("failed to encode response body: %v, %w", err, domain.ErrInternal),
+			h.Encoder,
+			h.Log,
+		)
 		return
 	}
 
@@ -118,10 +126,7 @@ func (h *API) handleGetArchive(w http.ResponseWriter, r *http.Request) {
 	if id == "" {
 		writeError(
 			w,
-			domain.ErrBadRequest.Wrap(
-				"query parameter ID is empty",
-				nil,
-			),
+			fmt.Errorf("query parameter ID is empty: %w", domain.ErrBadRequest),
 			h.Encoder,
 			h.Log,
 		)
@@ -142,10 +147,7 @@ func (h *API) handleGetArchiveInfo(w http.ResponseWriter, r *http.Request) {
 	if id == "" {
 		writeError(
 			w,
-			domain.ErrBadRequest.Wrap(
-				"query parameter ID is empty",
-				nil,
-			),
+			fmt.Errorf("query parameter ID is empty: %w", domain.ErrBadRequest),
 			h.Encoder,
 			h.Log,
 		)
@@ -163,7 +165,12 @@ func (h *API) handleGetArchiveInfo(w http.ResponseWriter, r *http.Request) {
 	responseBytes, err := h.Encoder.Marshal(responseDTO)
 	if err != nil {
 		h.Log.Error("failed to encode response body", err)
-		writeError(w, domain.ErrInternal.Wrap("failed to encode response body", nil), h.Encoder, h.Log)
+		writeError(
+			w,
+			fmt.Errorf("failed to encode response body: %v, %w", err, domain.ErrInternal),
+			h.Encoder,
+			h.Log,
+		)
 		return
 	}
 
@@ -174,7 +181,12 @@ func writeResponse(w http.ResponseWriter, response []byte, responseType response
 	w.Header().Set("Content-Type", responseType)
 	if _, err := w.Write(response); err != nil {
 		l.Error("failed to write response body", logger.FieldError, err)
-		writeError(w, domain.ErrInternal.Wrap("failed to write response body", nil), enc, l)
+		writeError(
+			w,
+			fmt.Errorf("failed to write response body: %v, %w", err, domain.ErrInternal),
+			enc,
+			l,
+		)
 	}
 }
 

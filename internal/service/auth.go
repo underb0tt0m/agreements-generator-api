@@ -27,11 +27,11 @@ func NewAuth(s storage.UserStorage, t token_manager.TokenManager, h hasher.Hashe
 
 func (a *Auth) Register(ctx context.Context, userData dto.RegisterRequest) (string, error) {
 	if len(userData.Password) < 8 {
-		return "", domain.ErrBadRequest.Wrap("password is too short", nil)
+		return "", fmt.Errorf("can't register user, password is too short: %w", domain.ErrBadRequest)
 	}
 
 	if userData.Login == "" {
-		return "", domain.ErrBadRequest.Wrap("Login is empty", nil)
+		return "", fmt.Errorf("can't register user, login is empty: %w", domain.ErrBadRequest)
 	}
 
 	hashedPassword, err := a.hasher.Hash(userData.Password)
