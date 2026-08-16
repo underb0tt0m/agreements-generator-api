@@ -13,7 +13,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type Generator struct {
+//go:generate mockgen -source=generator.go -destination=../mocks/generator.go -package=mocks -mock_names=Generator=MockGeneratorService
+type Generator interface {
+	BulkGenerate(ctx context.Context, archiveBytes []byte) (string, error)
+	CheckJobStatus(ctx context.Context, id string) (domain.JobStatus, error)
+	GetArchive(ctx context.Context, jobID string) ([]byte, error)
+	GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error)
+}
+type generator struct {
 	log            logger.Logger
 	storage        storage.GeneratorStorage
 	client         gen_client.GeneratorClient
@@ -29,8 +36,8 @@ func NewGen(
 	clientHost string,
 	clientPort string,
 	jobMaxDuration time.Duration,
-) (*Generator, error) {
-	return &Generator{
+) (Generator, error) {
+	return &generator{
 		client:         client,
 		log:            l,
 		storage:        s,
@@ -40,7 +47,7 @@ func NewGen(
 	}, nil
 }
 
-func (g *Generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (string, error) {
+func (g *generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (string, error) {
 	g.log.Debug("sending gRPC request",
 		"archive_size", len(archiveBytes),
 	)
@@ -67,7 +74,7 @@ func (g *Generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 	return job.ID, nil
 }
 
-func (g *Generator) CheckJobStatus(ctx context.Context, id string) (domain.JobStatus, error) {
+func (g *generator) CheckJobStatus(ctx context.Context, id string) (domain.JobStatus, error) {
 	status, err := g.storage.CheckJobStatus(ctx, id)
 
 	if err != nil {
@@ -82,7 +89,7 @@ func (g *Generator) CheckJobStatus(ctx context.Context, id string) (domain.JobSt
 	return jobStatus, nil
 }
 
-func (g *Generator) GetArchive(ctx context.Context, jobID string) ([]byte, error) {
+func (g *generator) GetArchive(ctx context.Context, jobID string) ([]byte, error) {
 	status, archive, err := g.storage.GetArchive(ctx, jobID)
 
 	if err != nil {
@@ -105,7 +112,7 @@ func (g *Generator) GetArchive(ctx context.Context, jobID string) ([]byte, error
 	return archive, nil
 }
 
-func (g *Generator) GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error) {
+func (g *generator) GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error) {
 	status, genErrs, genCnt, err := g.storage.GetArchiveInfo(ctx, jobID)
 
 	if err != nil {
@@ -124,7 +131,7 @@ func (g *Generator) GetArchiveInfo(ctx context.Context, jobID string) ([]domain.
 	return genErrs, genCnt, nil
 }
 
-func (g *Generator) processJob(
+func (g *generator) processJob(
 	job domain.Job,
 	archiveBytes []byte,
 	jobCtx context.Context,

@@ -4,6 +4,9 @@ import (
 	"agreements-generator/internal/domain"
 )
 
+type ErrorResponse struct {
+	Details string `json:"details"`
+}
 type BulkGenerateResponse struct {
 	JobID string `json:"job_id"`
 }
@@ -23,7 +26,7 @@ type FilesErrors struct {
 	Errors   []string `json:"errors"`
 }
 
-func NewGetArchiveInfoResponse(grpcErrs []domain.FilesErrors, genCnt int) *GetArchiveInfoResponse {
+func NewGetArchiveInfoResponse(grpcErrs []domain.FilesErrors, genCnt int) GetArchiveInfoResponse {
 	httpErrs := make([]FilesErrors, 0, len(grpcErrs))
 	for _, fileErrs := range grpcErrs {
 		errs := make([]string, 0, len(fileErrs.Errors))
@@ -35,7 +38,7 @@ func NewGetArchiveInfoResponse(grpcErrs []domain.FilesErrors, genCnt int) *GetAr
 			Errors:   errs,
 		})
 	}
-	return &GetArchiveInfoResponse{
+	return GetArchiveInfoResponse{
 		GenErrs: httpErrs,
 		GenCnt:  genCnt,
 	}

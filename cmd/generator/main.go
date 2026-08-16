@@ -75,7 +75,6 @@ func main() {
 
 	genHandler := api_v1.API{
 		Log:     logger,
-		Cfg:     cfg,
 		Service: gen,
 		Encoder: encoder,
 	}
