@@ -2,6 +2,7 @@ package api_v1
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -26,21 +27,36 @@ func MWAuth(tokenMaker token_manager.TokenManager, enc encoder.Encoder, log logg
 
 			token, ok := strings.CutPrefix(rawToken, tokenMaker.GetPrefix())
 			if !ok {
-				writeError(w, domain.ErrUnauthorized.Wrap("token without prefix", nil), enc, log)
+				writeError(
+					w,
+					fmt.Errorf("token without prefix: %w", domain.ErrUnauthorized),
+					enc,
+					log,
+				)
 				return
 			}
 
 			token = strings.TrimSpace(token)
 			if err := tokenMaker.Validate(token); err != nil {
 				log.Debug("validation is failed", logger.FieldError, err)
-				writeError(w, domain.ErrUnauthorized.Wrap("invalid token", nil), enc, log)
+				writeError(
+					w,
+					fmt.Errorf("invalid token: %v, %w", err, domain.ErrInvalidToken),
+					enc,
+					log,
+				)
 				return
 			}
 
 			usr := user{}
 			if err := tokenMaker.Parse(token, &usr); err != nil {
 				log.Debug("can't parse token", logger.FieldError, err)
-				writeError(w, domain.ErrUnauthorized.Wrap("invalid token", nil), enc, log)
+				writeError(
+					w,
+					fmt.Errorf("invalid token: %v, %w", err, domain.ErrInvalidToken),
+					enc,
+					log,
+				)
 				return
 			}
 

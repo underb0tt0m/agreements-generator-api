@@ -1,6 +1,7 @@
 package api_v1
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 
@@ -29,13 +30,23 @@ func (a *Auth) RegisterRoutes(r chi.Router) {
 func (a *Auth) handleRegister(w http.ResponseWriter, r *http.Request) {
 	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeError(w, domain.ErrInternal.Wrap("can't read request body", err), a.Encoder, a.Log)
+		writeError(
+			w,
+			fmt.Errorf("can't read request body: %v, %w", err, domain.ErrInternal),
+			a.Encoder,
+			a.Log,
+		)
 		return
 	}
 
 	userData := dto.RegisterRequest{}
 	if err = a.Encoder.Unmarshal(requestBody, &userData); err != nil {
-		writeError(w, domain.ErrUnprocessableEntity.Wrap("can't parse request body", err), a.Encoder, a.Log)
+		writeError(
+			w,
+			fmt.Errorf("can't parse request body: %v, %w", err, domain.ErrUnprocessableEntity),
+			a.Encoder,
+			a.Log,
+		)
 		return
 	}
 
@@ -49,7 +60,12 @@ func (a *Auth) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	response, err := a.Encoder.Marshal(tokenDTO)
 	if err != nil {
-		writeError(w, domain.ErrInternal.Wrap("can't marshal response body", err), a.Encoder, a.Log)
+		writeError(
+			w,
+			fmt.Errorf("can't marshal response body: %v, %w", err, domain.ErrInternal),
+			a.Encoder,
+			a.Log,
+		)
 		return
 	}
 
@@ -59,13 +75,23 @@ func (a *Auth) handleRegister(w http.ResponseWriter, r *http.Request) {
 func (a *Auth) handleLogIn(w http.ResponseWriter, r *http.Request) {
 	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeError(w, domain.ErrInternal.Wrap("can't read request body", err), a.Encoder, a.Log)
+		writeError(
+			w,
+			fmt.Errorf("can't read request body: %v, %w", err, domain.ErrInternal),
+			a.Encoder,
+			a.Log,
+		)
 		return
 	}
 
 	userData := dto.LogInRequest{}
 	if err = a.Encoder.Unmarshal(requestBody, &userData); err != nil {
-		writeError(w, domain.ErrUnprocessableEntity.Wrap("can't parse request body", err), a.Encoder, a.Log)
+		writeError(
+			w,
+			fmt.Errorf("can't parse request body: %v, %w", err, domain.ErrUnprocessableEntity),
+			a.Encoder,
+			a.Log,
+		)
 		return
 	}
 
@@ -79,7 +105,12 @@ func (a *Auth) handleLogIn(w http.ResponseWriter, r *http.Request) {
 
 	response, err := a.Encoder.Marshal(tokenDTO)
 	if err != nil {
-		writeError(w, domain.ErrInternal.Wrap("can't marshal response body", err), a.Encoder, a.Log)
+		writeError(
+			w,
+			fmt.Errorf("can't marshal response body: %v, %w", err, domain.ErrInternal),
+			a.Encoder,
+			a.Log,
+		)
 		return
 	}
 

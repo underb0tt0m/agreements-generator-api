@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+//go:generate mockgen -source=client.go -destination=../mocks/client.go -package=mocks
 type GeneratorClient interface {
 	BulkGenerate(ctx context.Context, archive []byte, responseChan chan *domain.GenResponse, errChan chan error)
 	Close() error

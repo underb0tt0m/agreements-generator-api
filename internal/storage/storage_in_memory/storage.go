@@ -2,6 +2,7 @@ package storage_in_memory
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -64,7 +65,7 @@ func (s *MemoryStorage) StoreJob(_ context.Context, job domain.Job) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.data[job.ID]; exists {
-		return domain.ErrConflict.Wrap("job already exists", nil)
+		return fmt.Errorf("job already exists: %w", domain.ErrConflict)
 	}
 	s.data[job.ID] = &JobData{
 		Status:    job.Status,
@@ -78,7 +79,7 @@ func (s *MemoryStorage) UpdateJob(_ context.Context, job domain.Job) error {
 	defer s.mu.Unlock()
 	jobData, exists := s.data[job.ID]
 	if !exists {
-		return domain.ErrNotFound.Wrap("job not found", nil)
+		return fmt.Errorf("job not found: %w", domain.ErrNotFound)
 	}
 	jobData.Status = job.Status
 	return nil
@@ -89,7 +90,7 @@ func (s *MemoryStorage) CheckJobStatus(_ context.Context, id string) (string, er
 	defer s.mu.RUnlock()
 	job, exists := s.data[id]
 	if !exists {
-		return "", domain.ErrNotFound.Wrap("job not found", nil)
+		return "", fmt.Errorf("job not found: %w", domain.ErrNotFound)
 	}
 	return string(job.Status), nil
 }
@@ -99,7 +100,7 @@ func (s *MemoryStorage) SaveResponse(_ context.Context, job domain.Job, response
 	defer s.mu.Unlock()
 	jobData, exists := s.data[job.ID]
 	if !exists {
-		return domain.ErrNotFound.Wrap("job not found", nil)
+		return fmt.Errorf("job not found: %w", domain.ErrNotFound)
 	}
 	if err != nil {
 		job.Status = domain.StatusFailed
@@ -118,7 +119,7 @@ func (s *MemoryStorage) GetArchive(_ context.Context, jobID string) (string, []b
 	defer s.mu.RUnlock()
 	job, exists := s.data[jobID]
 	if !exists {
-		return "", nil, domain.ErrNotFound.Wrap("job not found", nil)
+		return "", nil, fmt.Errorf("job not found: %w", domain.ErrNotFound)
 	}
 
 	return string(job.Status), job.Archive, nil
@@ -129,7 +130,7 @@ func (s *MemoryStorage) GetArchiveInfo(_ context.Context, jobID string) (string,
 	defer s.mu.RUnlock()
 	job, exists := s.data[jobID]
 	if !exists {
-		return "", nil, 0, domain.ErrNotFound.Wrap("job not found", nil)
+		return "", nil, 0, fmt.Errorf("job not found: %w", domain.ErrNotFound)
 	}
 
 	return string(job.Status), job.Errors, job.GenCount, nil
@@ -140,7 +141,7 @@ func (s *MemoryStorage) Register(_ context.Context, user domain.User) error {
 	defer s.mu.Unlock()
 
 	if _, exists := s.users[user.Login]; exists {
-		return domain.ErrConflict.Wrap("user already exists", nil)
+		return fmt.Errorf("user already exists: %w", domain.ErrConflict)
 	}
 
 	s.users[user.Login] = &UserData{
@@ -157,7 +158,7 @@ func (s *MemoryStorage) LogIn(_ context.Context, login string) ([]byte, error) {
 
 	userData, exists := s.users[login]
 	if !exists {
-		return nil, domain.ErrNotFound.Wrap("user not found", nil)
+		return nil, fmt.Errorf("user not found: %w", domain.ErrNotFound)
 	}
 	return userData.PasswordHash, nil
 }

@@ -26,7 +26,7 @@ func JobStatusFromString(status string) (JobStatus, error) {
 	case string(StatusFailed):
 		return StatusFailed, nil
 	default:
-		return "", ErrInternal.Wrap(fmt.Sprint("unknown job status: ", status), nil)
+		return "", fmt.Errorf("unknown job status: %s; %w", status, ErrInternal)
 	}
 }
 
