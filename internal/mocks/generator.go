@@ -101,3 +101,15 @@ func (mr *MockGeneratorServiceMockRecorder) GetArchiveInfo(ctx, jobID any) *gomo
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetArchiveInfo", reflect.TypeOf((*MockGeneratorService)(nil).GetArchiveInfo), ctx, jobID)
 }
+
+// ProcessJob mocks base method.
+func (m *MockGeneratorService) ProcessJob(job domain.Job, archiveBytes []byte, jobCtx context.Context, ctxCancel context.CancelFunc, errChan chan error, responseChan chan *domain.GenResponse) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ProcessJob", job, archiveBytes, jobCtx, ctxCancel, errChan, responseChan)
+}
+
+// ProcessJob indicates an expected call of ProcessJob.
+func (mr *MockGeneratorServiceMockRecorder) ProcessJob(job, archiveBytes, jobCtx, ctxCancel, errChan, responseChan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessJob", reflect.TypeOf((*MockGeneratorService)(nil).ProcessJob), job, archiveBytes, jobCtx, ctxCancel, errChan, responseChan)
+}

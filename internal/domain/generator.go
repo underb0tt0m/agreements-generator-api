@@ -39,6 +39,7 @@ type User struct {
 type ContextKey string
 
 const LoginKey ContextKey = "login"
+const UserIDKey ContextKey = "userID"
 
 type GenResponse struct {
 	Archive  []byte

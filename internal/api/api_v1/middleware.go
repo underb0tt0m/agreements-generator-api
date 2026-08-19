@@ -13,7 +13,8 @@ import (
 )
 
 type user struct {
-	Login string `yaml:"login"`
+	ID    int    `json:"id"`
+	Login string `json:"login"`
 }
 
 func MWAuth(tokenMaker token_manager.TokenManager, enc encoder.Encoder, log logger.Logger) func(next http.Handler) http.Handler {
@@ -60,7 +61,11 @@ func MWAuth(tokenMaker token_manager.TokenManager, enc encoder.Encoder, log logg
 				return
 			}
 
+			log.Debug(fmt.Sprintf("set context variables. login: %v, userID: %v", usr.Login, usr.ID))
+
 			ctx := context.WithValue(r.Context(), domain.LoginKey, usr.Login)
+			ctx = context.WithValue(ctx, domain.UserIDKey, usr.ID)
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

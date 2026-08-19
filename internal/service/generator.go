@@ -19,6 +19,13 @@ type Generator interface {
 	CheckJobStatus(ctx context.Context, id string) (domain.JobStatus, error)
 	GetArchive(ctx context.Context, jobID string) ([]byte, error)
 	GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error)
+	ProcessJob(
+		job domain.Job,
+		archiveBytes []byte,
+		jobCtx context.Context,
+		ctxCancel context.CancelFunc,
+		errChan chan error,
+		responseChan chan *domain.GenResponse)
 }
 type generator struct {
 	log            logger.Logger
@@ -62,14 +69,28 @@ func (g *generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 		Status: domain.StatusProcessing,
 	}
 
-	if err = g.storage.StoreJob(ctx, job); err != nil {
+	userID, ok := ctx.Value(domain.UserIDKey).(int)
+	if !ok {
+		g.log.Error(fmt.Sprintf("userID isn't integer: %v", ctx.Value(domain.UserIDKey)))
+	}
+
+	if err = g.storage.StoreJob(ctx, job, userID); err != nil {
 		return "", fmt.Errorf("can't add job with ID %s in storage: %w", job.ID, err)
 	}
 
 	jobCtx, cancel := context.WithTimeout(context.Background(), g.jobMaxDuration)
+
+	g.log.Debug(fmt.Sprintf(
+		"set job context variables. login: %v, userID: %v",
+		ctx.Value(domain.LoginKey),
+		ctx.Value(domain.UserIDKey)),
+	)
+	jobCtx = context.WithValue(jobCtx, domain.LoginKey, ctx.Value(domain.LoginKey))
+	jobCtx = context.WithValue(jobCtx, domain.UserIDKey, ctx.Value(domain.UserIDKey))
+
 	responseChan := make(chan *domain.GenResponse)
 	errChan := make(chan error)
-	go g.processJob(job, archiveBytes, jobCtx, cancel, errChan, responseChan)
+	go g.ProcessJob(job, archiveBytes, jobCtx, cancel, errChan, responseChan)
 
 	return job.ID, nil
 }
@@ -90,7 +111,7 @@ func (g *generator) CheckJobStatus(ctx context.Context, id string) (domain.JobSt
 }
 
 func (g *generator) GetArchive(ctx context.Context, jobID string) ([]byte, error) {
-	status, archive, err := g.storage.GetArchive(ctx, jobID)
+	status, archive, fatalGenErr, err := g.storage.GetArchive(ctx, jobID)
 
 	if err != nil {
 		return nil, fmt.Errorf("can't get archive from store: %w", err)
@@ -102,6 +123,9 @@ func (g *generator) GetArchive(ctx context.Context, jobID string) ([]byte, error
 	}
 
 	if jobStatus != domain.StatusCompleted {
+		if fatalGenErr != "" {
+			return nil, fmt.Errorf("can't get archive: fatal generation error: %s: %w", fatalGenErr, domain.ErrInternal)
+		}
 		return nil, domain.ErrJobNotFinished
 	}
 
@@ -113,7 +137,7 @@ func (g *generator) GetArchive(ctx context.Context, jobID string) ([]byte, error
 }
 
 func (g *generator) GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error) {
-	status, genErrs, genCnt, err := g.storage.GetArchiveInfo(ctx, jobID)
+	status, genErrs, genCnt, fatalGenErr, err := g.storage.GetArchiveInfo(ctx, jobID)
 
 	if err != nil {
 		return nil, 0, fmt.Errorf("can't get archive info from store: %w", err)
@@ -125,13 +149,16 @@ func (g *generator) GetArchiveInfo(ctx context.Context, jobID string) ([]domain.
 	}
 
 	if jobStatus != domain.StatusCompleted {
+		if fatalGenErr != "" {
+			return nil, 0, fmt.Errorf("can't get archive info: fatal generation error: %s: %w", fatalGenErr, domain.ErrInternal)
+		}
 		return nil, 0, fmt.Errorf("can't get archive info: %w", domain.ErrJobNotFinished)
 	}
 
 	return genErrs, genCnt, nil
 }
 
-func (g *generator) processJob(
+func (g *generator) ProcessJob(
 	job domain.Job,
 	archiveBytes []byte,
 	jobCtx context.Context,

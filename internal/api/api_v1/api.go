@@ -203,7 +203,7 @@ func writeError(w http.ResponseWriter, err error, enc encoder.Encoder, l logger.
 		return
 	}
 
-	l.Debug("error during request", logger.FieldError, err, "first error", errors.Unwrap(appErr))
+	l.Debug("error during request", logger.FieldError, err)
 
 	w.WriteHeader(appErr.HTTPStatus)
 

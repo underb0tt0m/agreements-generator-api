@@ -782,17 +782,17 @@ func Test_WriteError(t *testing.T) {
 			case dto.ErrorResponse:
 				var responseBody dto.ErrorResponse
 				if err := json.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
-					t.Errorf("handleGetArchiveInfo(): can't unmarshal response body: %v", err)
+					t.Errorf("writeError(): can't unmarshal response body: %v", err)
 					return
 				}
 				assert.Equal(t, tt.expectedBody, responseBody)
 			case nil:
 				if rr.Body.String() != "" {
-					t.Errorf("handleGetArchiveInfo(): not nil response body, expected nil")
+					t.Errorf("writeError(): not nil response body, expected nil")
 					return
 				}
 			default:
-				t.Errorf("handleGetArchiveInfo(): unhandled expected response scheme: %T, can handle %T, %T",
+				t.Errorf("writeError(): unhandled expected response scheme: %T, can handle %T, %T",
 					tt.expectedBody,
 					dto.ErrorResponse{},
 					nil,

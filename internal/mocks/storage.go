@@ -57,13 +57,14 @@ func (mr *MockGeneratorStorageMockRecorder) CheckJobStatus(ctx, id any) *gomock.
 }
 
 // GetArchive mocks base method.
-func (m *MockGeneratorStorage) GetArchive(ctx context.Context, jobID string) (string, []byte, error) {
+func (m *MockGeneratorStorage) GetArchive(ctx context.Context, jobID string) (string, []byte, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetArchive", ctx, jobID)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]byte)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret2, _ := ret[2].(string)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
 }
 
 // GetArchive indicates an expected call of GetArchive.
@@ -73,14 +74,15 @@ func (mr *MockGeneratorStorageMockRecorder) GetArchive(ctx, jobID any) *gomock.C
 }
 
 // GetArchiveInfo mocks base method.
-func (m *MockGeneratorStorage) GetArchiveInfo(ctx context.Context, jobID string) (string, []domain.FilesErrors, int, error) {
+func (m *MockGeneratorStorage) GetArchiveInfo(ctx context.Context, jobID string) (string, []domain.FilesErrors, int, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetArchiveInfo", ctx, jobID)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]domain.FilesErrors)
 	ret2, _ := ret[2].(int)
-	ret3, _ := ret[3].(error)
-	return ret0, ret1, ret2, ret3
+	ret3, _ := ret[3].(string)
+	ret4, _ := ret[4].(error)
+	return ret0, ret1, ret2, ret3, ret4
 }
 
 // GetArchiveInfo indicates an expected call of GetArchiveInfo.
@@ -104,17 +106,17 @@ func (mr *MockGeneratorStorageMockRecorder) SaveResponse(ctx, job, response, err
 }
 
 // StoreJob mocks base method.
-func (m *MockGeneratorStorage) StoreJob(ctx context.Context, job domain.Job) error {
+func (m *MockGeneratorStorage) StoreJob(ctx context.Context, job domain.Job, userID int) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StoreJob", ctx, job)
+	ret := m.ctrl.Call(m, "StoreJob", ctx, job, userID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StoreJob indicates an expected call of StoreJob.
-func (mr *MockGeneratorStorageMockRecorder) StoreJob(ctx, job any) *gomock.Call {
+func (mr *MockGeneratorStorageMockRecorder) StoreJob(ctx, job, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreJob", reflect.TypeOf((*MockGeneratorStorage)(nil).StoreJob), ctx, job)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreJob", reflect.TypeOf((*MockGeneratorStorage)(nil).StoreJob), ctx, job, userID)
 }
 
 // UpdateJob mocks base method.
@@ -156,12 +158,13 @@ func (m *MockUserStorage) EXPECT() *MockUserStorageMockRecorder {
 }
 
 // LogIn mocks base method.
-func (m *MockUserStorage) LogIn(ctx context.Context, login string) ([]byte, error) {
+func (m *MockUserStorage) LogIn(ctx context.Context, login string) (int, []byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LogIn", ctx, login)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // LogIn indicates an expected call of LogIn.
@@ -171,11 +174,12 @@ func (mr *MockUserStorageMockRecorder) LogIn(ctx, login any) *gomock.Call {
 }
 
 // Register mocks base method.
-func (m *MockUserStorage) Register(ctx context.Context, user domain.User) error {
+func (m *MockUserStorage) Register(ctx context.Context, user domain.User) (int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", ctx, user)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Register indicates an expected call of Register.

@@ -60,7 +60,7 @@ func TestAuth_Register(t *testing.T) {
 					s.
 						EXPECT().
 						Register(gomock.Any(), gomock.Any()).
-						Return(nil)
+						Return(1, nil)
 					t.
 						EXPECT().
 						Create(gomock.Any()).
@@ -152,7 +152,7 @@ func TestAuth_Register(t *testing.T) {
 					s.
 						EXPECT().
 						Register(gomock.Any(), gomock.Any()).
-						Return(domain.ErrStorageBadRequest)
+						Return(0, domain.ErrStorageBadRequest)
 				},
 			},
 			expectedErr: domain.ErrStorageBadRequest,
@@ -180,7 +180,7 @@ func TestAuth_Register(t *testing.T) {
 					s.
 						EXPECT().
 						Register(gomock.Any(), gomock.Any()).
-						Return(nil)
+						Return(1, nil)
 					t.
 						EXPECT().
 						Create(gomock.Any()).
@@ -259,7 +259,7 @@ func TestAuth_LogIn(t *testing.T) {
 					s.
 						EXPECT().
 						LogIn(gomock.Any(), gomock.Any()).
-						Return([]byte{}, nil)
+						Return(1, []byte{}, nil)
 					h.
 						EXPECT().
 						Compare(gomock.Any(), gomock.Any()).
@@ -290,7 +290,7 @@ func TestAuth_LogIn(t *testing.T) {
 					s.
 						EXPECT().
 						LogIn(gomock.Any(), gomock.Any()).
-						Return(nil, domain.ErrStorageBadRequest)
+						Return(0, nil, domain.ErrStorageBadRequest)
 				},
 			},
 			expectedErr: domain.ErrStorageBadRequest,
@@ -313,7 +313,7 @@ func TestAuth_LogIn(t *testing.T) {
 					s.
 						EXPECT().
 						LogIn(gomock.Any(), gomock.Any()).
-						Return([]byte{}, nil)
+						Return(1, []byte{}, nil)
 					h.
 						EXPECT().
 						Compare(gomock.Any(), gomock.Any()).
@@ -340,7 +340,7 @@ func TestAuth_LogIn(t *testing.T) {
 					s.
 						EXPECT().
 						LogIn(gomock.Any(), gomock.Any()).
-						Return([]byte{}, nil)
+						Return(1, []byte{}, nil)
 					h.
 						EXPECT().
 						Compare(gomock.Any(), gomock.Any()).

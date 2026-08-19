@@ -17,7 +17,7 @@ import (
 	"agreements-generator/internal/hasher"
 	loggerModule "agreements-generator/internal/logger"
 	"agreements-generator/internal/service"
-	"agreements-generator/internal/storage/storage_in_memory"
+	"agreements-generator/internal/storage"
 	"agreements-generator/internal/token_manager"
 
 	"github.com/go-chi/chi/v5"
@@ -38,8 +38,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	appStorage := storage_in_memory.NewMemoryStorage(cfg)
-
 	encoder := encoder_json.New()
 	hashEr := hasher.New(cfg.Security.HashCost)
 	tokenMng := token_manager.New(
@@ -50,6 +48,11 @@ func main() {
 		cfg.Security.SecretKey,
 		cfg.JWT.Prefix,
 	)
+
+	generatorStorage, userStorage, err := storage.New(context.Background(), cfg, logger, encoder)
+	if err != nil {
+		logger.Fatal("can't create storage", loggerModule.FieldError, err)
+	}
 
 	URI := fmt.Sprintf("%s:%s", cfg.GRPCClient.Host, cfg.GRPCClient.Port)
 	conn, err := grpc.NewClient(URI, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -62,7 +65,7 @@ func main() {
 
 	gen, err := service.NewGen(
 		logger,
-		appStorage,
+		generatorStorage,
 		genClient,
 		cfg.GRPCClient.Host,
 		cfg.GRPCClient.Port,
@@ -71,7 +74,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("can't init service layer", loggerModule.FieldError, err)
 	}
-	auth := service.NewAuth(appStorage, tokenMng, hashEr)
+	auth := service.NewAuth(userStorage, tokenMng, hashEr)
 
 	genHandler := api_v1.API{
 		Log:     logger,
