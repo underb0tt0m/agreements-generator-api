@@ -11,6 +11,11 @@ grpc_client:
   job_max_duration: "30s"
 storage:
   job_ttl: "5m"
+  type: "postgres"
+  driver: "postgres"
+  host: "host.docker.internal"
+  port: "5432"
+  database: "generator"
 jwt:
   jwt_signing_method: "HS256" # support HS256, ES256, RS256
   token_ttl: "1h"

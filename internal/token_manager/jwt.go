@@ -55,6 +55,7 @@ func New(l logger.Logger, e encoder.Encoder, ttl time.Duration, signM string, se
 
 type UserClaims struct {
 	Login string
+	ID    int
 }
 
 func (t *tokenMaker) Create(data any) (string, error) {

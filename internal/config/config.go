@@ -43,12 +43,19 @@ type gRPCClient struct {
 }
 
 type storage struct {
-	JobTTL time.Duration `yaml:"job_ttl" env-default:"5m"`
+	JobTTL   time.Duration `yaml:"job_ttl" env-default:"5m"`
+	Type     string        `yaml:"type" env-default:"postgres"`
+	Driver   string        `yaml:"driver" env-default:"postgres"`
+	Host     string        `yaml:"host" env-default:"localhost"`
+	Port     string        `yaml:"port" env-default:"5432"`
+	Database string        `yaml:"database" env-default:"docx_generator"`
 }
 
 type security struct {
-	HashCost  int `yaml:"hash_cost" env-default:"10"`
-	SecretKey string
+	HashCost   int `yaml:"hash_cost" env-default:"10"`
+	SecretKey  string
+	DBUser     string
+	DBPassword string
 }
 
 type jWT struct {
@@ -73,15 +80,15 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("can't read config: %w", err)
 	}
 
-	secret, ok := os.LookupEnv("JWT_SECRET")
-	if !ok {
-		return nil, fmt.Errorf("JWT secret string is denied")
+	if err := loadEnvVars(
+		map[string]*string{
+			"JWT_SECRET":  &cfg.Security.SecretKey,
+			"DB_USER":     &cfg.Security.DBUser,
+			"DB_PASSWORD": &cfg.Security.DBPassword,
+		},
+	); err != nil {
+		return nil, err
 	}
-	if secret == "" {
-		return nil, fmt.Errorf("JWT secret is empty")
-	}
-
-	cfg.Security.SecretKey = secret
 
 	return &cfg, nil
 }
@@ -97,4 +104,18 @@ func fetchConfigPath() string {
 	}
 
 	return res
+}
+
+func loadEnvVars(m map[string]*string) error {
+	for name, cfgValue := range m {
+		envValue, ok := os.LookupEnv(name)
+		if !ok {
+			return fmt.Errorf("%v is denied", name)
+		}
+		if envValue == "" {
+			return fmt.Errorf("%v is empty", name)
+		}
+		*cfgValue = envValue
+	}
+	return nil
 }

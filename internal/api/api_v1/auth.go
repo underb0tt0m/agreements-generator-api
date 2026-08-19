@@ -17,7 +17,7 @@ import (
 type Auth struct {
 	Encoder encoder.Encoder
 	Log     logger.Logger
-	Service *service.Auth
+	Service service.Auth
 }
 
 func (a *Auth) RegisterRoutes(r chi.Router) {

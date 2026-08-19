@@ -24,19 +24,19 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 	storage.
 		EXPECT().
 		GetArchiveInfo(ctx, "success").
-		Return("completed", nil, 1, nil)
+		Return("completed", nil, 1, "", nil)
 	storage.
 		EXPECT().
 		GetArchiveInfo(ctx, "wrong status").
-		Return("wrong status", nil, 0, nil)
+		Return("wrong status", nil, 0, "", nil)
 	storage.
 		EXPECT().
 		GetArchiveInfo(ctx, "job not completed").
-		Return("processing", nil, 0, nil)
+		Return("processing", nil, 0, "", nil)
 	storage.
 		EXPECT().
 		GetArchiveInfo(ctx, "error from storage").
-		Return("", nil, 0, domain.ErrStorageBadRequest)
+		Return("", nil, 0, "", domain.ErrStorageBadRequest)
 
 	client := mocks.NewMockGeneratorClient(ctrl)
 
@@ -139,19 +139,19 @@ func TestGenerator_GetArchive(t *testing.T) {
 	storage.
 		EXPECT().
 		GetArchive(ctx, "success").
-		Return("completed", []byte{}, nil)
+		Return("completed", []byte{}, "", nil)
 	storage.
 		EXPECT().
 		GetArchive(ctx, "wrong status").
-		Return("wrong status", nil, nil)
+		Return("wrong status", nil, "", nil)
 	storage.
 		EXPECT().
 		GetArchive(ctx, "job not completed").
-		Return("processing", nil, nil)
+		Return("processing", nil, "", nil)
 	storage.
 		EXPECT().
 		GetArchive(ctx, "empty archive").
-		Return("completed", nil, nil)
+		Return("completed", nil, "", nil)
 
 	client := mocks.NewMockGeneratorClient(ctrl)
 
@@ -401,7 +401,7 @@ func TestGenerator_BulkGenerate(t *testing.T) {
 				setupMocks: func(s *mocks.MockGeneratorStorage, c *mocks.MockGeneratorClient) {
 					s.
 						EXPECT().
-						StoreJob(ctx, gomock.Any()).
+						StoreJob(ctx, gomock.Any(), gomock.Any()).
 						Return(nil)
 					c.
 						EXPECT().
@@ -425,7 +425,7 @@ func TestGenerator_BulkGenerate(t *testing.T) {
 				setupMocks: func(s *mocks.MockGeneratorStorage, _ *mocks.MockGeneratorClient) {
 					s.
 						EXPECT().
-						StoreJob(ctx, gomock.Any()).
+						StoreJob(ctx, gomock.Any(), gomock.Any()).
 						Return(domain.ErrStorageBadRequest)
 				},
 			},
@@ -633,7 +633,7 @@ func TestGeneratorProcessJob(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 
-			s.processJob(tt.args.job, tt.args.archive, ctx, cancel, errChan, responseChan)
+			s.ProcessJob(tt.args.job, tt.args.archive, ctx, cancel, errChan, responseChan)
 		})
 	}
 }

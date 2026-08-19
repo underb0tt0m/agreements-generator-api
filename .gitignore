@@ -6,3 +6,5 @@ gen/
 
 test.zip
 web/
+coverage.html
+coverage.out

@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 
-	"agreements-generator/internal/config"
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/dto"
 	"agreements-generator/internal/encoder"
@@ -24,14 +23,9 @@ const (
 	responseZIP  = responseType("application/zip")
 )
 
-type errorResponse struct {
-	Details string `json:"details"`
-}
-
 type API struct {
 	Log     logger.Logger
-	Cfg     *config.Config
-	Service *service.Generator
+	Service service.Generator
 	Encoder encoder.Encoder
 }
 
@@ -197,7 +191,7 @@ func writeError(w http.ResponseWriter, err error, enc encoder.Encoder, l logger.
 
 		w.WriteHeader(domain.ErrInternal.HTTPStatus)
 
-		body := errorResponse{Details: domain.ErrInternal.Msg}
+		body := dto.ErrorResponse{Details: domain.ErrInternal.Msg}
 		responseBytes, encodeErr := enc.Marshal(body)
 		if encodeErr != nil {
 			l.Error("failed to encode error response body", logger.FieldError, encodeErr)
@@ -209,11 +203,11 @@ func writeError(w http.ResponseWriter, err error, enc encoder.Encoder, l logger.
 		return
 	}
 
-	l.Debug("error during request", logger.FieldError, err, "first error", errors.Unwrap(appErr))
+	l.Debug("error during request", logger.FieldError, err)
 
 	w.WriteHeader(appErr.HTTPStatus)
 
-	body := errorResponse{Details: appErr.Msg}
+	body := dto.ErrorResponse{Details: appErr.Msg}
 	responseBytes, encodeErr := enc.Marshal(body)
 	if encodeErr != nil {
 		l.Error("failed to encode error response body", logger.FieldError, encodeErr)

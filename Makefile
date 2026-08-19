@@ -19,4 +19,12 @@ docker-build:
 	docker build -t agreements-generator-server .
 
 docker-run:
-	docker run -p 8080:8080 --rm --name agreements-generator-server -v $(CONFIG):/root/config.yaml server
+	docker run -p 8080:8080 --rm --name agreements-generator-server -v $(CONFIG):
+
+test:
+	go test -v -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	go tool cover -func=coverage.out
+
+clean:
+	rm -f coverage.out coverage.html
