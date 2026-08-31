@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"agreements-generator/internal/cache"
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/gen_client"
 	"agreements-generator/internal/logger"
@@ -30,9 +31,8 @@ type Generator interface {
 type generator struct {
 	log            logger.Logger
 	storage        storage.GeneratorStorage
-	client         gen_client.GeneratorClient
-	clientHost     string
-	clientPort     string
+	grpcClient     gen_client.GeneratorClient
+	cacher         cache.Cacher
 	jobMaxDuration time.Duration
 }
 
@@ -40,16 +40,14 @@ func NewGen(
 	l logger.Logger,
 	s storage.GeneratorStorage,
 	client gen_client.GeneratorClient,
-	clientHost string,
-	clientPort string,
+	cacher cache.Cacher,
 	jobMaxDuration time.Duration,
 ) (Generator, error) {
 	return &generator{
-		client:         client,
+		grpcClient:     client,
+		cacher:         cacher,
 		log:            l,
 		storage:        s,
-		clientHost:     clientHost,
-		clientPort:     clientPort,
 		jobMaxDuration: jobMaxDuration,
 	}, nil
 }
@@ -78,6 +76,10 @@ func (g *generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 		return "", fmt.Errorf("can't add job with ID %s in storage: %w", job.ID, err)
 	}
 
+	if err = g.cacher.SetJobStatus(ctx, job.ID, string(job.Status)); err != nil {
+		g.log.Error("failed to set status in cache", logger.FieldError, err)
+	}
+
 	jobCtx, cancel := context.WithTimeout(context.Background(), g.jobMaxDuration)
 
 	g.log.Debug(fmt.Sprintf(
@@ -96,15 +98,32 @@ func (g *generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (stri
 }
 
 func (g *generator) CheckJobStatus(ctx context.Context, id string) (domain.JobStatus, error) {
-	status, err := g.storage.CheckJobStatus(ctx, id)
+	var (
+		dbErr     error
+		cacherErr error
+		status    string
+	)
 
-	if err != nil {
-		return domain.StatusFailed, fmt.Errorf("can't check job status: %w", err)
+	status, cacherErr = g.cacher.GetJobStatus(ctx, id)
+
+	if cacherErr != nil {
+		g.log.Warn("can't get job status from cache, trying to get from db", logger.FieldError, cacherErr)
+
+		status, dbErr = g.storage.CheckJobStatus(ctx, id)
+		if dbErr != nil {
+			return domain.StatusFailed, fmt.Errorf("can't check job status: %w", dbErr)
+		}
 	}
 
 	jobStatus, statusErr := domain.JobStatusFromString(status)
 	if statusErr != nil {
 		return domain.StatusFailed, fmt.Errorf("can't convert job status: %w", statusErr)
+	}
+
+	if cacherErr != nil {
+		if cacherErr = g.cacher.SetJobStatus(ctx, id, string(jobStatus)); cacherErr != nil {
+			g.log.Error("can't update job status in cache", logger.FieldError, cacherErr)
+		}
 	}
 
 	return jobStatus, nil
@@ -170,12 +189,9 @@ func (g *generator) ProcessJob(
 	defer close(errChan)
 	defer close(responseChan)
 
-	g.log.Debug("connecting to gRPC",
-		"host", g.clientHost,
-		"port", g.clientPort,
-	)
+	g.log.Debug("connecting to gRPC")
 
-	go g.client.BulkGenerate(jobCtx, archiveBytes, responseChan, errChan)
+	go g.grpcClient.BulkGenerate(jobCtx, archiveBytes, responseChan, errChan)
 
 	g.log.Debug("waiting client's response")
 
@@ -196,6 +212,10 @@ func (g *generator) ProcessJob(
 			g.log.Error("job failed; can't update job status", logger.FieldError, storageErr)
 		}
 
+		if cacherErr := g.cacher.SetJobStatus(jobCtx, failedJob.ID, string(failedJob.Status)); cacherErr != nil {
+			g.log.Error("can't update job info in cache", logger.FieldError, cacherErr)
+		}
+
 		return
 	}
 
@@ -206,11 +226,19 @@ func (g *generator) ProcessJob(
 			g.log.Error("can't update job status", logger.FieldError, storageErr)
 		}
 
+		if cacherErr := g.cacher.SetJobStatus(jobCtx, failedJob.ID, string(failedJob.Status)); cacherErr != nil {
+			g.log.Error("can't update job info in cache", logger.FieldError, cacherErr)
+		}
+
 		return
 	}
 
 	if storageErr := g.storage.UpdateJob(jobCtx, completedJob); storageErr != nil {
 		g.log.Error("can't update job status", logger.FieldError, storageErr)
+	}
+
+	if cacherErr := g.cacher.SetJobStatus(jobCtx, completedJob.ID, string(completedJob.Status)); cacherErr != nil {
+		g.log.Error("can't update job info in cache", logger.FieldError, cacherErr)
 	}
 
 }

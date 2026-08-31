@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"agreements-generator/internal/cache"
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/gen_client"
 	logger_package "agreements-generator/internal/logger"
@@ -39,11 +40,13 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 		Return("", nil, 0, "", domain.ErrStorageBadRequest)
 
 	client := mocks.NewMockGeneratorClient(ctrl)
+	cacher := mocks.NewMockCacher(ctrl)
 
 	type fields struct {
 		logger  logger_package.Logger
 		storage storage_package.GeneratorStorage
 		client  gen_client.GeneratorClient
+		cacher  cache.Cacher
 	}
 
 	type args struct {
@@ -63,6 +66,7 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
@@ -77,6 +81,7 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
@@ -91,6 +96,7 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
@@ -105,6 +111,7 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
@@ -116,7 +123,7 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, "", "", 10)
+			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
 
 			_, _, err := s.GetArchiveInfo(tt.args.ctx, tt.args.jobID)
 
@@ -154,11 +161,13 @@ func TestGenerator_GetArchive(t *testing.T) {
 		Return("completed", nil, "", nil)
 
 	client := mocks.NewMockGeneratorClient(ctrl)
+	cacher := mocks.NewMockCacher(ctrl)
 
 	type fields struct {
 		logger  logger_package.Logger
 		storage storage_package.GeneratorStorage
 		client  gen_client.GeneratorClient
+		cacher  cache.Cacher
 	}
 
 	type args struct {
@@ -179,6 +188,7 @@ func TestGenerator_GetArchive(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
@@ -194,6 +204,7 @@ func TestGenerator_GetArchive(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
@@ -209,6 +220,7 @@ func TestGenerator_GetArchive(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
@@ -224,6 +236,7 @@ func TestGenerator_GetArchive(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
@@ -236,7 +249,7 @@ func TestGenerator_GetArchive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, "", "", 10)
+			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
 
 			archive, err := s.GetArchive(tt.args.ctx, tt.args.jobID)
 
@@ -260,30 +273,23 @@ func TestGenerator_CheckJobStatus(t *testing.T) {
 	logger := logger_package.NewNoop()
 
 	storage := mocks.NewMockGeneratorStorage(ctrl)
-	storage.
-		EXPECT().
-		CheckJobStatus(ctx, "success").
-		Return("completed", nil)
-	storage.
-		EXPECT().
-		CheckJobStatus(ctx, "error from storage").
-		Return("jfjf", domain.ErrStorageBadRequest)
-	storage.
-		EXPECT().
-		CheckJobStatus(ctx, "invalid job status").
-		Return("jfjf", nil)
-
 	client := mocks.NewMockGeneratorClient(ctrl)
+	cacher := mocks.NewMockCacher(ctrl)
 
 	type fields struct {
 		logger  logger_package.Logger
-		storage storage_package.GeneratorStorage
-		client  gen_client.GeneratorClient
+		storage *mocks.MockGeneratorStorage
+		client  *mocks.MockGeneratorClient
+		cacher  *mocks.MockCacher
 	}
 
 	type args struct {
-		ctx   context.Context
-		jobId string
+		ctx        context.Context
+		jobId      string
+		setupMocks func(
+			s *mocks.MockGeneratorStorage,
+			c *mocks.MockGeneratorClient,
+			r *mocks.MockCacher)
 	}
 
 	tests := []struct {
@@ -299,12 +305,55 @@ func TestGenerator_CheckJobStatus(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
 				jobId: "success",
+				setupMocks: func(
+					_ *mocks.MockGeneratorStorage,
+					_ *mocks.MockGeneratorClient,
+					r *mocks.MockCacher) {
+					r.
+						EXPECT().
+						GetJobStatus(gomock.Any(), gomock.Any()).
+						Return("completed", nil)
+				},
 			},
 			expectedStatus: domain.StatusCompleted,
+			expectedErr:    nil,
+		},
+
+		{
+			name: "error from redis while getting status",
+			fields: fields{
+				logger:  logger,
+				storage: storage,
+				client:  client,
+				cacher:  cacher,
+			},
+			args: args{
+				ctx:   ctx,
+				jobId: "id",
+				setupMocks: func(
+					s *mocks.MockGeneratorStorage,
+					_ *mocks.MockGeneratorClient,
+					r *mocks.MockCacher) {
+					r.
+						EXPECT().
+						GetJobStatus(gomock.Any(), gomock.Any()).
+						Return("", errors.New("error from redis"))
+					r.
+						EXPECT().
+						SetJobStatus(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(nil)
+					s.
+						EXPECT().
+						CheckJobStatus(gomock.Any(), gomock.Any()).
+						Return("processing", nil)
+				},
+			},
+			expectedStatus: domain.StatusProcessing,
 			expectedErr:    nil,
 		},
 
@@ -314,10 +363,24 @@ func TestGenerator_CheckJobStatus(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
 				jobId: "error from storage",
+				setupMocks: func(
+					s *mocks.MockGeneratorStorage,
+					_ *mocks.MockGeneratorClient,
+					r *mocks.MockCacher) {
+					r.
+						EXPECT().
+						GetJobStatus(gomock.Any(), gomock.Any()).
+						Return("", errors.New("error from redis"))
+					s.
+						EXPECT().
+						CheckJobStatus(gomock.Any(), gomock.Any()).
+						Return("", domain.ErrStorageBadRequest)
+				},
 			},
 			expectedStatus: domain.StatusFailed,
 			expectedErr:    domain.ErrStorageBadRequest,
@@ -329,10 +392,20 @@ func TestGenerator_CheckJobStatus(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:   ctx,
 				jobId: "invalid job status",
+				setupMocks: func(
+					_ *mocks.MockGeneratorStorage,
+					_ *mocks.MockGeneratorClient,
+					r *mocks.MockCacher) {
+					r.
+						EXPECT().
+						GetJobStatus(gomock.Any(), gomock.Any()).
+						Return("wrong status", nil)
+				},
 			},
 			expectedStatus: domain.StatusFailed,
 			expectedErr:    domain.ErrInternal,
@@ -341,7 +414,11 @@ func TestGenerator_CheckJobStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, "", "", 10)
+			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
+
+			if tt.args.setupMocks != nil {
+				tt.args.setupMocks(tt.fields.storage, tt.fields.client, tt.fields.cacher)
+			}
 
 			status, err := s.CheckJobStatus(tt.args.ctx, tt.args.jobId)
 
@@ -368,17 +445,22 @@ func TestGenerator_BulkGenerate(t *testing.T) {
 
 	storage := mocks.NewMockGeneratorStorage(ctrl)
 	client := mocks.NewMockGeneratorClient(ctrl)
+	cacher := mocks.NewMockCacher(ctrl)
 
 	type fields struct {
 		logger  logger_package.Logger
 		storage *mocks.MockGeneratorStorage
 		client  *mocks.MockGeneratorClient
+		cacher  *mocks.MockCacher
 	}
 
 	type args struct {
 		ctx        context.Context
 		archive    []byte
-		setupMocks func(s *mocks.MockGeneratorStorage, c *mocks.MockGeneratorClient)
+		setupMocks func(
+			s *mocks.MockGeneratorStorage,
+			c *mocks.MockGeneratorClient,
+			r *mocks.MockCacher)
 	}
 
 	tests := []struct {
@@ -394,11 +476,15 @@ func TestGenerator_BulkGenerate(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:     ctx,
 				archive: []byte("success"),
-				setupMocks: func(s *mocks.MockGeneratorStorage, c *mocks.MockGeneratorClient) {
+				setupMocks: func(
+					s *mocks.MockGeneratorStorage,
+					c *mocks.MockGeneratorClient,
+					r *mocks.MockCacher) {
 					s.
 						EXPECT().
 						StoreJob(ctx, gomock.Any(), gomock.Any()).
@@ -407,6 +493,10 @@ func TestGenerator_BulkGenerate(t *testing.T) {
 						EXPECT().
 						BulkGenerate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 						AnyTimes()
+					r.
+						EXPECT().
+						SetJobStatus(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(nil)
 				},
 			},
 			expectedErr: nil,
@@ -418,11 +508,15 @@ func TestGenerator_BulkGenerate(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				ctx:     ctx,
 				archive: []byte("error from storage"),
-				setupMocks: func(s *mocks.MockGeneratorStorage, _ *mocks.MockGeneratorClient) {
+				setupMocks: func(
+					s *mocks.MockGeneratorStorage,
+					_ *mocks.MockGeneratorClient,
+					_ *mocks.MockCacher) {
 					s.
 						EXPECT().
 						StoreJob(ctx, gomock.Any(), gomock.Any()).
@@ -431,15 +525,47 @@ func TestGenerator_BulkGenerate(t *testing.T) {
 			},
 			expectedErr: domain.ErrStorageBadRequest,
 		},
+
+		{
+			name: "error from cacher",
+			fields: fields{
+				logger:  logger,
+				storage: storage,
+				client:  client,
+				cacher:  cacher,
+			},
+			args: args{
+				ctx:     ctx,
+				archive: []byte("error from cacher"),
+				setupMocks: func(
+					s *mocks.MockGeneratorStorage,
+					c *mocks.MockGeneratorClient,
+					r *mocks.MockCacher) {
+					s.
+						EXPECT().
+						StoreJob(ctx, gomock.Any(), gomock.Any()).
+						Return(nil)
+					c.
+						EXPECT().
+						BulkGenerate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+						AnyTimes()
+					r.
+						EXPECT().
+						SetJobStatus(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(errors.New("some error"))
+				},
+			},
+			expectedErr: nil,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.args.setupMocks != nil {
-				tt.args.setupMocks(tt.fields.storage, tt.fields.client)
+				tt.args.setupMocks(tt.fields.storage, tt.fields.client, tt.fields.cacher)
 			}
 
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, "", "", 10)
+			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
 
 			jobID, err := s.BulkGenerate(tt.args.ctx, tt.args.archive)
 
@@ -464,17 +590,19 @@ func TestGeneratorProcessJob(t *testing.T) {
 
 	storage := mocks.NewMockGeneratorStorage(ctrl)
 	client := mocks.NewMockGeneratorClient(ctrl)
+	cacher := mocks.NewMockCacher(ctrl)
 
 	type fields struct {
 		logger  logger_package.Logger
 		storage *mocks.MockGeneratorStorage
 		client  *mocks.MockGeneratorClient
+		cacher  *mocks.MockCacher
 	}
 
 	type args struct {
 		job        domain.Job
 		archive    []byte
-		setupMocks func(s *mocks.MockGeneratorStorage, c *mocks.MockGeneratorClient)
+		setupMocks func(s *mocks.MockGeneratorStorage, c *mocks.MockGeneratorClient, r *mocks.MockCacher)
 	}
 
 	tests := []struct {
@@ -490,11 +618,15 @@ func TestGeneratorProcessJob(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				job:     domain.Job{ID: "success", Status: domain.StatusProcessing},
 				archive: []byte("success"),
-				setupMocks: func(s *mocks.MockGeneratorStorage, c *mocks.MockGeneratorClient) {
+				setupMocks: func(
+					s *mocks.MockGeneratorStorage,
+					c *mocks.MockGeneratorClient,
+					r *mocks.MockCacher) {
 					s.
 						EXPECT().
 						SaveResponse(
@@ -525,6 +657,14 @@ func TestGeneratorProcessJob(t *testing.T) {
 							responseChan <- &domain.GenResponse{}
 						},
 						)
+					r.
+						EXPECT().
+						SetJobStatus(
+							gomock.Any(),
+							gomock.Any(),
+							gomock.Cond(func(x string) bool { return x == "completed" }),
+						).
+						Return(nil)
 				},
 			},
 		},
@@ -535,11 +675,15 @@ func TestGeneratorProcessJob(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				job:     domain.Job{ID: "error during generation", Status: domain.StatusProcessing},
 				archive: []byte("error during generation"),
-				setupMocks: func(s *mocks.MockGeneratorStorage, c *mocks.MockGeneratorClient) {
+				setupMocks: func(
+					s *mocks.MockGeneratorStorage,
+					c *mocks.MockGeneratorClient,
+					r *mocks.MockCacher) {
 					s.
 						EXPECT().
 						SaveResponse(
@@ -570,6 +714,14 @@ func TestGeneratorProcessJob(t *testing.T) {
 							responseChan <- &domain.GenResponse{}
 						},
 						)
+					r.
+						EXPECT().
+						SetJobStatus(
+							gomock.Any(),
+							gomock.Any(),
+							gomock.Cond(func(x string) bool { return x == "failed" }),
+						).
+						Return(nil)
 				},
 			},
 		},
@@ -580,11 +732,15 @@ func TestGeneratorProcessJob(t *testing.T) {
 				logger:  logger,
 				storage: storage,
 				client:  client,
+				cacher:  cacher,
 			},
 			args: args{
 				job:     domain.Job{ID: "error during saving", Status: domain.StatusProcessing},
 				archive: []byte("error during saving"),
-				setupMocks: func(s *mocks.MockGeneratorStorage, c *mocks.MockGeneratorClient) {
+				setupMocks: func(
+					s *mocks.MockGeneratorStorage,
+					c *mocks.MockGeneratorClient,
+					r *mocks.MockCacher) {
 					s.
 						EXPECT().
 						SaveResponse(
@@ -615,6 +771,14 @@ func TestGeneratorProcessJob(t *testing.T) {
 							responseChan <- &domain.GenResponse{}
 						},
 						)
+					r.
+						EXPECT().
+						SetJobStatus(
+							gomock.Any(),
+							gomock.Any(),
+							gomock.Cond(func(x string) bool { return x == "failed" }),
+						).
+						Return(nil)
 				},
 			},
 		},
@@ -623,10 +787,10 @@ func TestGeneratorProcessJob(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.args.setupMocks != nil {
-				tt.args.setupMocks(tt.fields.storage, tt.fields.client)
+				tt.args.setupMocks(tt.fields.storage, tt.fields.client, tt.fields.cacher)
 			}
 
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, "", "", 10)
+			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
 
 			errChan := make(chan error)
 			responseChan := make(chan *domain.GenResponse)
