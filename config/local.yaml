@@ -16,6 +16,11 @@ storage:
   host: "host.docker.internal"
   port: "5432"
   database: "generator"
+redis:
+  host: "redis"
+  port: 6379
+  db: 0
+  job_status_ttl: "10m"
 jwt:
   jwt_signing_method: "HS256" # support HS256, ES256, RS256
   token_ttl: "1h"

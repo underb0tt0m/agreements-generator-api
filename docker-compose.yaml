@@ -17,3 +17,15 @@ services:
       - ./config/local.yaml:/root/config.yaml
     depends_on:
       - worker
+      - redis
+  
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    ports:
+      - "6379-6379"
+    env_file:
+      - .env
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    restart: unless-stopped
+    

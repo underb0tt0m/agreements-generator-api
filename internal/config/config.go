@@ -23,6 +23,7 @@ type Config struct {
 	Server     server     `yaml:"server"`
 	GRPCClient gRPCClient `yaml:"grpc_client"`
 	Storage    storage    `yaml:"storage"`
+	Redis      redis      `yaml:"redis"`
 	JWT        jWT        `yaml:"jwt"`
 	Security   security   `yaml:"security"`
 }
@@ -51,11 +52,19 @@ type storage struct {
 	Database string        `yaml:"database" env-default:"docx_generator"`
 }
 
+type redis struct {
+	Host         string        `yaml:"host" env-default:"localhost"`
+	Port         string        `yaml:"port" env-default:"6379"`
+	Db           int           `yaml:"db" env-default:"0"`
+	JobStatusTTL time.Duration `yaml:"job_status_ttl" env-default:"10m"`
+}
+
 type security struct {
-	HashCost   int `yaml:"hash_cost" env-default:"10"`
-	SecretKey  string
-	DBUser     string
-	DBPassword string
+	HashCost      int `yaml:"hash_cost" env-default:"10"`
+	SecretKey     string
+	DBUser        string
+	DBPassword    string
+	RedisPassword string
 }
 
 type jWT struct {
@@ -82,9 +91,10 @@ func Load() (*Config, error) {
 
 	if err := loadEnvVars(
 		map[string]*string{
-			"JWT_SECRET":  &cfg.Security.SecretKey,
-			"DB_USER":     &cfg.Security.DBUser,
-			"DB_PASSWORD": &cfg.Security.DBPassword,
+			"JWT_SECRET":     &cfg.Security.SecretKey,
+			"DB_USER":        &cfg.Security.DBUser,
+			"DB_PASSWORD":    &cfg.Security.DBPassword,
+			"REDIS_PASSWORD": &cfg.Security.RedisPassword,
 		},
 	); err != nil {
 		return nil, err

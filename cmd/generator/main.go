@@ -11,6 +11,7 @@ import (
 
 	"agreements-generator/gen/go/generator"
 	"agreements-generator/internal/api/api_v1"
+	"agreements-generator/internal/cache"
 	"agreements-generator/internal/config"
 	"agreements-generator/internal/encoder/encoder_json"
 	"agreements-generator/internal/gen_client"
@@ -60,15 +61,17 @@ func main() {
 		logger.Error("can't create GRPC Client", loggerModule.FieldError, err)
 	}
 
-	genClient := gen_client.New(generator.NewGeneratorClient(conn), conn, logger)
-	defer genClient.Close()
+	grpcClient := gen_client.New(generator.NewGeneratorClient(conn), conn, logger)
+	defer grpcClient.Close()
+
+	cacher := cache.New(cfg.Redis.Host, cfg.Redis.Port, cfg.Security.RedisPassword, cfg.Redis.Db, cfg.Redis.JobStatusTTL)
+	defer cacher.Close()
 
 	gen, err := service.NewGen(
 		logger,
 		generatorStorage,
-		genClient,
-		cfg.GRPCClient.Host,
-		cfg.GRPCClient.Port,
+		grpcClient,
+		cacher,
 		cfg.GRPCClient.JobMaxDuration,
 	)
 	if err != nil {
