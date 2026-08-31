@@ -2,6 +2,7 @@ package gen_client
 
 import (
 	"context"
+	"fmt"
 
 	"agreements-generator/gen/go/generator"
 	"agreements-generator/internal/domain"
@@ -10,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-//go:generate mockgen -source=client.go -destination=../mocks/client.go -package=mocks
+//go:generate mockgen -source=client.go -destination=../mocks/genClient.go -package=mocks
 type GeneratorClient interface {
 	BulkGenerate(ctx context.Context, archive []byte, responseChan chan *domain.GenResponse, errChan chan error)
 	Close() error
@@ -35,8 +36,8 @@ func (c *client) BulkGenerate(
 	response, err := c.grpcClient.Generate(ctx, &generator.GenerateRequest{Archive: archive})
 	if err != nil {
 		c.logger.Debug("can't get grpcs response", logger.FieldError, err)
+		errChan <- fmt.Errorf("can't get grpcs response: %v, %w", err, domain.ErrGenClient)
 		responseChan <- &domain.GenResponse{}
-		errChan <- domain.ErrGenClient
 		return
 	}
 
