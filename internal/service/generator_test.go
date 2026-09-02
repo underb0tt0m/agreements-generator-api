@@ -38,7 +38,6 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 		EXPECT().
 		GetArchiveInfo(ctx, "error from storage").
 		Return("", nil, 0, "", domain.ErrStorageBadRequest)
-
 	client := mocks.NewMockGeneratorClient(ctrl)
 	cacher := mocks.NewMockCacher(ctrl)
 

@@ -13,7 +13,7 @@ storage:
   job_ttl: "5m"
   type: "postgres"
   driver: "postgres"
-  host: "host.docker.internal"
+  host: "db"
   port: "5432"
   database: "generator"
 redis:
