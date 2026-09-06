@@ -17,6 +17,7 @@ import (
 	"agreements-generator/internal/gen_client"
 	"agreements-generator/internal/hasher"
 	loggerModule "agreements-generator/internal/logger"
+	"agreements-generator/internal/publisher"
 	"agreements-generator/internal/service"
 	"agreements-generator/internal/storage"
 	"agreements-generator/internal/token_manager"
@@ -58,7 +59,7 @@ func main() {
 	URI := fmt.Sprintf("%s:%s", cfg.GRPCClient.Host, cfg.GRPCClient.Port)
 	conn, err := grpc.NewClient(URI, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Error("can't create GRPC Client", loggerModule.FieldError, err)
+		logger.Fatal("can't create GRPC Client", loggerModule.FieldError, err)
 	}
 
 	grpcClient := gen_client.New(generator.NewGeneratorClient(conn), conn, logger)
@@ -67,10 +68,26 @@ func main() {
 	cacher := cache.New(cfg.Redis.Host, cfg.Redis.Port, cfg.Security.RedisPassword, cfg.Redis.Db, cfg.Redis.JobStatusTTL)
 	defer cacher.Close()
 
+	publer, err := publisher.New(
+		cfg.RabbitMQ.Host,
+		cfg.RabbitMQ.Port,
+		cfg.RabbitMQ.Username,
+		cfg.Security.RabbitMQPassword,
+		cfg.RabbitMQ.Vhost,
+		cfg.RabbitMQ.Queue,
+		encoder,
+	)
+	if err != nil {
+		logger.Fatal("can't create publisher", loggerModule.FieldError, err)
+	}
+	defer publer.Close()
+
 	gen, err := service.NewGen(
+		cfg.ExecMod,
 		logger,
 		generatorStorage,
 		grpcClient,
+		publer,
 		cacher,
 		cfg.GRPCClient.JobMaxDuration,
 	)

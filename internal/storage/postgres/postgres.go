@@ -36,7 +36,7 @@ func New(conn *pgx.Conn, logger logger_package.Logger, encoder encoder.Encoder, 
 
 func (s *StorageGenerator) GetArchive(ctx context.Context, jobID string) (string, []byte, string, error) {
 	stmt := `
-SELECT j.status, a.archive, a.fatal_gen_error
+SELECT j.status, a.archive, COALESCE(a.fatal_gen_error, '') as fatal_gen_error
 FROM archives a
 JOIN jobs j ON a.job_id=j.id
 WHERE a.job_id=$1;
@@ -57,7 +57,7 @@ WHERE a.job_id=$1;
 
 func (s *StorageGenerator) GetArchiveInfo(ctx context.Context, jobID string) (string, []domain.FilesErrors, int, string, error) {
 	stmt := `
-SELECT j.status, a.gen_errors, a.gen_count, a.fatal_gen_error
+SELECT j.status, a.gen_errors, COALESCE(a.gen_count, 0), COALESCE(a.fatal_gen_error, '') as fatal_gen_error
 FROM archives a
 JOIN jobs j ON a.job_id=j.id
 WHERE a.job_id=$1;
@@ -195,6 +195,18 @@ WHERE login = $1;
 	}
 
 	return userID, password, nil
+}
+
+func (s *StorageGenerator) SaveRawArchive(ctx context.Context, jobID string, archive []byte) error {
+	stmt := `
+INSERT INTO input_archives (job_id, archive)
+VALUES ($1, $2);
+`
+	if _, err := s.conn.Exec(ctx, stmt, jobID, archive); err != nil {
+		return newDomainErrFromPgx(err)
+	}
+
+	return nil
 }
 
 func newDomainErrFromPgx(err error) error {

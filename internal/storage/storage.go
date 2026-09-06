@@ -34,6 +34,10 @@ type UserStorage interface {
 	LogIn(ctx context.Context, login string) (int, []byte, error)
 }
 
+type InputArchiveStorer interface {
+	SaveRawArchive(ctx context.Context, jobID string, archive []byte) error
+}
+
 func New(ctx context.Context, cfg *config.Config, logger loggerModule.Logger, encoder encoder.Encoder) (GeneratorStorage, UserStorage, error) {
 	var userStorage UserStorage
 	var generatorStorage GeneratorStorage

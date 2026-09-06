@@ -1,14 +1,21 @@
+execution_mode: "queue" #grpc | queue
+
 env: "local"
+
 logger:
   type: "zap"
   level: "development"
+  
 server:
   port: 8080
   shutdown_duration: "10s"
+  
+
 grpc_client:
   host: "worker"
   port: 50051
   job_max_duration: "30s"
+  
 storage:
   job_ttl: "5m"
   type: "postgres"
@@ -16,15 +23,25 @@ storage:
   host: "db"
   port: "5432"
   database: "generator"
+  
 redis:
   host: "redis"
   port: 6379
   db: 0
   job_status_ttl: "10m"
+  
+rabbit_mq:
+  host: "rabbitmq"
+  port: 5672
+  username: "guest"
+  vhost: "/"
+  queue: "jobs"
+  
 jwt:
   jwt_signing_method: "HS256" # support HS256, ES256, RS256
   token_ttl: "1h"
   prefix: "Bearer"
+  
 security:
   hash_cost: 10
   
