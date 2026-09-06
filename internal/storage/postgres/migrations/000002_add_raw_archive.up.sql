@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS input_archives (
+    id SERIAL PRIMARY KEY,
+    job_id TEXT UNIQUE NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    archive BYTEA,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+)

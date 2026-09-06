@@ -21,9 +21,11 @@ type Config struct {
 	Env        string     `yaml:"env" env-default:"production"`
 	Log        logger     `yaml:"logger"`
 	Server     server     `yaml:"server"`
+	ExecMod    string     `yaml:"execution_mode"`
 	GRPCClient gRPCClient `yaml:"grpc_client"`
 	Storage    storage    `yaml:"storage"`
 	Redis      redis      `yaml:"redis"`
+	RabbitMQ   rabbitMQ   `yaml:"rabbit_mq"`
 	JWT        jWT        `yaml:"jwt"`
 	Security   security   `yaml:"security"`
 }
@@ -59,12 +61,21 @@ type redis struct {
 	JobStatusTTL time.Duration `yaml:"job_status_ttl" env-default:"10m"`
 }
 
+type rabbitMQ struct {
+	Host     string `yaml:"host" env-default:"localhost"`
+	Port     int    `yaml:"port" env-default:"5672"`
+	Username string `yaml:"username"`
+	Vhost    string `yaml:"vhost"`
+	Queue    string `yaml:"queue"`
+}
+
 type security struct {
-	HashCost      int `yaml:"hash_cost" env-default:"10"`
-	SecretKey     string
-	DBUser        string
-	DBPassword    string
-	RedisPassword string
+	HashCost         int `yaml:"hash_cost" env-default:"10"`
+	SecretKey        string
+	DBUser           string
+	DBPassword       string
+	RedisPassword    string
+	RabbitMQPassword string
 }
 
 type jWT struct {
@@ -91,10 +102,11 @@ func Load() (*Config, error) {
 
 	if err := loadEnvVars(
 		map[string]*string{
-			"JWT_SECRET":     &cfg.Security.SecretKey,
-			"DB_USER":        &cfg.Security.DBUser,
-			"DB_PASSWORD":    &cfg.Security.DBPassword,
-			"REDIS_PASSWORD": &cfg.Security.RedisPassword,
+			"JWT_SECRET":        &cfg.Security.SecretKey,
+			"DB_USER":           &cfg.Security.DBUser,
+			"DB_PASSWORD":       &cfg.Security.DBPassword,
+			"REDIS_PASSWORD":    &cfg.Security.RedisPassword,
+			"RABBITMQ_PASSWORD": &cfg.Security.RabbitMQPassword,
 		},
 	); err != nil {
 		return nil, err

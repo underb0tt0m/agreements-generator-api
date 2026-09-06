@@ -10,7 +10,9 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/generator/main.go
 
-FROM scratch
+FROM alpine:latest
+
+RUN apk add --no-cache curl
 
 WORKDIR /root/
 

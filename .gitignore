@@ -8,5 +8,6 @@ test.zip
 web/
 coverage.html
 coverage.out
+diff.txt
 
 ADS/

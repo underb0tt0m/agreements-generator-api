@@ -1,4 +1,4 @@
-package service
+package grpc_generator
 
 import (
 	"bytes"
@@ -122,7 +122,7 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
+			s, _ := NewGRPCGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
 
 			_, _, err := s.GetArchiveInfo(tt.args.ctx, tt.args.jobID)
 
@@ -248,7 +248,7 @@ func TestGenerator_GetArchive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
+			s, _ := NewGRPCGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
 
 			archive, err := s.GetArchive(tt.args.ctx, tt.args.jobID)
 
@@ -413,7 +413,7 @@ func TestGenerator_CheckJobStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
+			s, _ := NewGRPCGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
 
 			if tt.args.setupMocks != nil {
 				tt.args.setupMocks(tt.fields.storage, tt.fields.client, tt.fields.cacher)
@@ -564,7 +564,7 @@ func TestGenerator_BulkGenerate(t *testing.T) {
 				tt.args.setupMocks(tt.fields.storage, tt.fields.client, tt.fields.cacher)
 			}
 
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
+			s, _ := NewGRPCGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
 
 			jobID, err := s.BulkGenerate(tt.args.ctx, tt.args.archive)
 
@@ -789,7 +789,7 @@ func TestGeneratorProcessJob(t *testing.T) {
 				tt.args.setupMocks(tt.fields.storage, tt.fields.client, tt.fields.cacher)
 			}
 
-			s, _ := NewGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
+			s, _ := NewGRPCGen(tt.fields.logger, tt.fields.storage, tt.fields.client, tt.fields.cacher, 10)
 
 			errChan := make(chan error)
 			responseChan := make(chan *domain.GenResponse)

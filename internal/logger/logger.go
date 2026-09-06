@@ -36,19 +36,19 @@ type zapLogger struct {
 func newZap(cfg *config.Config) (*zapLogger, error) {
 	switch cfg.Log.Level {
 	case "production":
-		l, err := zap.NewProduction()
+		l, err := zap.NewProduction(zap.AddCallerSkip(1))
 		if err != nil {
 			return nil, fmt.Errorf("can't init logger: %w", err)
 		}
 		return &zapLogger{l: l}, nil
 	case "development":
-		l, err := zap.NewDevelopment()
+		l, err := zap.NewDevelopment(zap.AddCallerSkip(1))
 		if err != nil {
 			return nil, fmt.Errorf("can't init logger: %w", err)
 		}
 		return &zapLogger{l: l}, nil
 	default:
-		l, err := zap.NewDevelopment()
+		l, err := zap.NewDevelopment(zap.AddCallerSkip(1))
 		if err != nil {
 			return nil, fmt.Errorf("can't init logger: %w", err)
 		}

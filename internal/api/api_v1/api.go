@@ -30,6 +30,8 @@ type API struct {
 }
 
 func (h *API) RegisterRoutes(r chi.Router, tokenMaker token_manager.TokenManager) {
+	r.Get("/health", h.handleHealthCheck)
+
 	r.Group(func(r chi.Router) {
 		r.Use(MWAuth(tokenMaker, h.Encoder, h.Log))
 		r.Post("/bulk_generate", h.handleBulkGenerate)
@@ -169,6 +171,10 @@ func (h *API) handleGetArchiveInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponse(w, responseBytes, responseJSON, h.Encoder, h.Log)
+}
+
+func (h *API) handleHealthCheck(w http.ResponseWriter, _ *http.Request) {
+	writeResponse(w, []byte("OK"), responseJSON, h.Encoder, h.Log)
 }
 
 func writeResponse(w http.ResponseWriter, response []byte, responseType responseType, enc encoder.Encoder, l logger.Logger) {
