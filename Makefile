@@ -1,6 +1,10 @@
-.PHONY: proto-go proto-python docker-build docker-run
+.PHONY: proto-go proto-python docker-build docker-run loadtest loadtest_smoke loadtest_load loadtest_constant
 
 CONFIG ?= ./config/local.yaml
+JWT ?=
+LOAD_TEST_FILE ?= smoke.js
+RATE ?= 8
+DURATION ?= 60s
 
 proto-go:
 	protoc -I proto proto/generator/generator.proto \
@@ -28,3 +32,15 @@ test:
 
 clean:
 	rm -f coverage.out coverage.html
+
+loadtest:
+	TOKEN=${JWT} k6 run loadtest/${LOAD_TEST_FILE}
+
+loadtest_smoke:
+	TOKEN=${JWT} k6 run loadtest/smoke.js
+
+loadtest_load:
+	TOKEN=${JWT} k6 run loadtest/load.js
+
+loadtest_constant:
+	RATE=$(RATE) DURATION=$(DURATION) TOKEN=$(JWT) k6 run loadtest/constant.js

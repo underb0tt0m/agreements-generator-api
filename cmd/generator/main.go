@@ -23,6 +23,7 @@ import (
 	"agreements-generator/internal/token_manager"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -108,6 +109,9 @@ func main() {
 	}
 
 	router := chi.NewRouter()
+
+	router.Use(api_v1.MWMetrics)
+	router.Handle("/metrics", promhttp.Handler())
 
 	genHandler.RegisterRoutes(router, tokenMng)
 	authHandler.RegisterRoutes(router)

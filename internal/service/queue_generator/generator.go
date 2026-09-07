@@ -8,6 +8,7 @@ import (
 	"agreements-generator/internal/cache"
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/logger"
+	appmetrics "agreements-generator/internal/metrics"
 	"agreements-generator/internal/publisher"
 	"agreements-generator/internal/storage"
 
@@ -38,7 +39,24 @@ func NewQueueGen(
 	}, nil
 }
 
-func (g *generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (string, error) {
+func (g *generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (jobID string, err error) {
+	start := time.Now()
+
+	defer func() {
+		result := "success"
+		if err != nil {
+			result = "error"
+		}
+
+		appmetrics.JobsSubmittedTotal.
+			WithLabelValues("queue", result).
+			Inc()
+
+		appmetrics.JobSubmissionDuration.
+			WithLabelValues("queue").
+			Observe(time.Since(start).Seconds())
+	}()
+
 	id, err := uuid.NewUUID()
 	if err != nil {
 		return "", fmt.Errorf("can't create job: %w", err)

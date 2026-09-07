@@ -3,6 +3,7 @@ package rabbit_publisher
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"agreements-generator/internal/encoder"
 
@@ -10,7 +11,8 @@ import (
 )
 
 type DeliveryJob struct {
-	JobID string `json:"job_id"`
+	JobID            string `json:"job_id"`
+	EnqueuedAtUnixMs int64  `json:"enqueued_at_unix_ms"`
 }
 
 type rabbitPublisher struct {
@@ -64,7 +66,10 @@ func New(
 }
 
 func (p *rabbitPublisher) Send(ctx context.Context, jobID string) error {
-	delivery, err := p.newPublishing(DeliveryJob{JobID: jobID})
+	delivery, err := p.newPublishing(DeliveryJob{
+		JobID:            jobID,
+		EnqueuedAtUnixMs: time.Now().UnixMilli(),
+	})
 	if err != nil {
 		return err
 	}

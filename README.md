@@ -1,11 +1,102 @@
 # Agreements Generator API
 
-Сервис для генерации договоров (DOCX) из Excel и DOCX-шаблонов. Поддерживает два режима работы:
+Сервис для генерации договоров в формате DOCX из Excel-файлов и DOCX-шаблонов.
 
-- **gRPC** — Go-сервер передаёт задачу Python-воркеру через gRPC (в фоновой горутине).
-- **Очередь (RabbitMQ)** — Go-сервер публикует задачу в очередь, Python-воркер забирает и обрабатывает асинхронно.
+Go-приложение предоставляет HTTP API, хранит состояние задач в PostgreSQL/Redis и поддерживает два способа взаимодействия с Python-воркером:
 
-Переключение через конфиг (`execution_mode: grpc` или `queue`).
+- **gRPC** — Go-сервис напрямую передаёт архив воркеру по gRPC и получает результат обратно.
+- **RabbitMQ** — Go-сервис сохраняет входной архив, публикует задачу в очередь, а Python-воркер обрабатывает её асинхронно.
+
+Режим выбирается через `execution_mode: grpc` или `execution_mode: queue`.
+
+---
+
+## Архитектура
+
+### gRPC
+
+```text
+Client
+  |
+  v
+Go HTTP API
+  |
+  +--> PostgreSQL / Redis
+  |
+  v
+gRPC
+  |
+  v
+Python Worker
+  |
+  v
+document generation
+  |
+  v
+gRPC response
+  |
+  v
+Go -> PostgreSQL / Redis
+```
+
+### RabbitMQ
+
+```text
+Client
+  |
+  v
+Go HTTP API
+  |
+  +--> PostgreSQL (job + input archive)
+  |
+  v
+RabbitMQ
+  |
+  v
+Python Consumer
+  |
+  +--> PostgreSQL (read input archive)
+  |
+  v
+document generation
+  |
+  +--> PostgreSQL (result)
+  +--> Redis (status)
+```
+
+---
+
+## Технологии
+
+### Go API
+
+- Go
+- chi
+- pgx / pgxpool
+- Redis
+- RabbitMQ
+- gRPC
+- JWT
+- Prometheus
+
+### Python worker
+
+- Python
+- gRPC
+- RabbitMQ / pika
+- psycopg2 connection pool
+- Redis
+- Prometheus client
+
+### Infrastructure
+
+- PostgreSQL
+- Redis
+- RabbitMQ
+- Docker Compose
+- Prometheus
+- Grafana
+- k6
 
 ---
 
@@ -14,43 +105,82 @@
 ### Требования
 
 - Go 1.26+
+- Python 3.13+
 - Docker & Docker Compose
-- Python 3.13+ (воркер)
+- k6 — только для нагрузочного тестирования
 
-### Быстрый старт (всё в Docker)
+### Клонирование
+
+Python-воркер подключён как Git submodule, поэтому рекомендуется клонировать проект так:
 
 ```bash
-docker-compose up --build
+git clone --recurse-submodules https://github.com/underb0tt0m/agreements-generator-api.git
+cd agreements-generator-api
 ```
 
-Сервер будет доступен по адресу: `http://localhost:8080`.
+Если репозиторий уже склонирован:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Быстрый старт
+
+```bash
+docker compose up --build
+```
+
+После запуска:
+
+- API: `http://localhost:8080`
+- API metrics: `http://localhost:8080/metrics`
+- Worker metrics: `http://localhost:8001/metrics`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
+
+Для локальной Grafana используются:
+
+```text
+login: admin
+password: admin
+```
+
+Prometheus datasource внутри Docker Compose:
+
+```text
+http://prometheus:9090
+```
 
 ### Локальная разработка
 
-1. Запустите Python-воркер (в режиме gRPC или consumer):
-   ```bash
-   cd worker
-   python -m cmd.main
-   ```
+1. Запустите Python-воркер:
+
+```bash
+cd worker
+python -m cmd.main
+```
 
 2. Запустите Go-сервер:
-   ```bash
-   go run cmd/generator/main.go -config ./config/server_local.yaml
-   ```
+
+```bash
+go run cmd/generator/main.go -config ./config/server_local.yaml
+```
 
 ---
 
 ## Конфигурация
 
-Конфиги разделены для сервера и воркера:
+Основные конфиги:
 
-- `config/server_local.yaml` — для Go-сервера.
-- `config/worker_local.yaml` — для Python-воркера.
+- `config/server_local.yaml` — Go API.
+- `config/worker_local.yaml` — Python worker.
 
-Пример `server_local.yaml`:
+### Go server
+
+Пример:
 
 ```yaml
-execution_mode: "queue" #grpc | queue
+execution_mode: "queue" # grpc | queue
 
 env: "local"
 
@@ -62,11 +192,10 @@ server:
   port: 8080
   shutdown_duration: "10s"
 
-
 grpc_client:
   host: "worker"
   port: 50051
-  job_max_duration: "30s"
+  job_max_duration: "2m"
 
 storage:
   job_ttl: "5m"
@@ -96,13 +225,26 @@ jwt:
 
 security:
   hash_cost: 10
-
 ```
 
-Все пароли и секреты загружаются из `.env`:
+### Worker
+
+В gRPC-режиме количество worker threads настраивается через:
+
+```yaml
+execution_mode: "grpc"
+
+max_workers: 1
+```
+
+Для PostgreSQL worker использует thread-safe connection pool с настраиваемым `max_conn`.
+
+### Environment variables
+
+Пароли и секреты загружаются из `.env`:
 
 ```env
-DB_PASSWORD=postgres
+DB_PASSWORD=password
 REDIS_PASSWORD=password
 RABBITMQ_PASSWORD=password
 JWT_SECRET=password
@@ -112,36 +254,183 @@ JWT_SECRET=password
 
 ## API
 
-Все эндпоинты требуют JWT-токен (кроме `/health`).
+JWT требуется для рабочих endpoint'ов. `/health` и `/metrics` используются как служебные endpoint'ы.
 
-| Метод | Эндпоинт | Описание |
-|-------|----------|----------|
+| Метод | Endpoint | Описание |
+|---|---|---|
 | POST | `/auth/register` | Регистрация пользователя |
-| POST | `/auth/login` | Логин, возвращает JWT |
-| POST | `/bulk_generate` | Загрузить архив → получить `job_id` |
-| GET | `/get_job_status?id={job_id}` | Статус задачи |
-| GET | `/get_archive_info?id={job_id}` | Ошибки и количество документов |
-| GET | `/get_archive?id={job_id}` | Скачать архив (ZIP) |
+| POST | `/auth/login` | Авторизация и получение JWT |
+| POST | `/bulk_generate` | Отправить ZIP-архив и получить `job_id` |
+| GET | `/get_job_status?id={job_id}` | Получить статус задачи |
+| GET | `/get_archive_info?id={job_id}` | Получить ошибки и количество созданных документов |
+| GET | `/get_archive?id={job_id}` | Скачать результирующий ZIP |
 | GET | `/health` | Healthcheck |
+| GET | `/metrics` | Prometheus metrics |
+
+---
+
+## Monitoring
+
+Prometheus собирает метрики отдельно с Go API и Python worker.
+
+### Основные HTTP-метрики
+
+```text
+http_requests_total
+http_request_duration_seconds
+http_requests_in_flight
+```
+
+### Метрики Go-сервиса
+
+```text
+generator_jobs_submitted_total
+generator_job_submission_duration_seconds
+generator_jobs_in_progress
+generator_job_processing_duration_seconds
+```
+
+### Метрики Python worker
+
+```text
+generator_worker_jobs_in_progress
+generator_worker_job_processing_duration_seconds
+generator_worker_jobs_processed_total
+generator_worker_generation_duration_seconds
+generator_queue_wait_duration_seconds
+```
+
+`generator_queue_wait_duration_seconds` используется только для RabbitMQ-режима и показывает время между публикацией сообщения и началом его обработки consumer'ом.
+
+---
+
+## Нагрузочное тестирование
+
+Для тестов используется k6.
+
+В репозитории есть три сценария:
+
+```text
+loadtest/
+├── smoke.js
+├── load.js
+├── constant.js
+└── fixtures/
+    └── test.zip
+```
+
+### Smoke test
+
+Проверяет полный сценарий:
+
+```text
+POST /bulk_generate
+        ↓
+polling /get_job_status
+        ↓
+completed / failed
+```
+
+Запуск:
+
+```bash
+make loadtest_smoke
+```
+
+### Stress test
+
+Постепенно увеличивает интенсивность примерно от `2` до `20 jobs/s`:
+
+```bash
+make loadtest_load
+```
+
+### Constant-rate test
+
+Запуск с фиксированной интенсивностью:
+
+```bash
+make loadtest_constant RATE=4 DURATION=60s
+```
+
+Для каждого теста измеряется **Time To Result** — время от отправки `/bulk_generate` до получения финального статуса задачи.
+
+---
+
+## Результаты нагрузочного тестирования
+
+Для корректного сравнения обе реализации тестировались при одинаковой concurrency:
+
+```text
+gRPC:      1 worker thread
+RabbitMQ:  1 consumer
+```
+
+Условия:
+
+- одинаковый тестовый ZIP;
+- одинаковый Go API;
+- одинаковые PostgreSQL и Redis;
+- один и тот же компьютер;
+- constant arrival rate;
+- длительность каждого теста — 60 секунд;
+- отсутствие HTTP- и job-ошибок во всех приведённых ниже прогонах.
+
+### Constant-rate benchmark
+
+| Target rate | gRPC TTR avg | gRPC TTR p95 | RabbitMQ TTR avg | RabbitMQ TTR p95 |
+|---:|---:|---:|---:|---:|
+| 2 jobs/s | 216 ms | 239 ms | 219 ms | 224 ms |
+| 4 jobs/s | 208 ms | 209 ms | 210 ms | 214 ms |
+| 6 jobs/s | 638 ms | 3.04 s | 208 ms | 212 ms |
+| 8 jobs/s | 14.37 s | 24.01 s | 8.67 s | 21.67 s |
+
+### Наблюдения
+
+При небольшой нагрузке (`2–4 jobs/s`) обе реализации показывают близкую end-to-end latency около `0.2 s`.
+
+При `6 jobs/s`:
+
+- RabbitMQ остаётся стабильным: `p95 ≈ 212 ms`;
+- у gRPC начинает расти tail latency: `p95 ≈ 3.04 s`.
+
+При `8 jobs/s` обе реализации уже работают выше устойчивой пропускной способности:
+
+- gRPC: `p95 ≈ 24.01 s`;
+- RabbitMQ: `p95 ≈ 21.67 s`.
+
+При перегрузке RabbitMQ сохраняет стабильное время непосредственной обработки одной job, но растёт `queue wait`: лишние задачи накапливаются в broker.
+
+В gRPC-режиме при одном worker сама генерация также остаётся быстрой, а задержка возникает из-за ожидания свободного gRPC worker.
+
+> Эти результаты относятся к конкретной реализации и тестовой среде проекта. Они не являются общим benchmark gRPC против RabbitMQ.
 
 ---
 
 ## Структура проекта
 
-```
+```text
 .
-├── cmd/                    # точки входа (Go)
-│   └── generator/          # main.go
-├── internal/               # бизнес-логика (API, service, storage)
-├── proto/                  # gRPC-контракт (generator.proto)
-├── worker/                 # Python-воркер (submodule)
-│   ├── cmd/                # точки входа Python
-│   │   ├── main.py         # единая точка (выбор режима по конфигу)
-│   │   ├── grpc_server/    # gRPC-сервер
-│   │   └── consumer/       # consumer RabbitMQ
-│   ├── internal/           # внутренняя логика Python
-│   └── config/             # конфиг воркера
-├── config/                 # конфиги для Go-сервера
+├── cmd/
+│   └── generator/                # entrypoint Go API
+├── config/                       # конфигурация Go-сервера
+├── internal/
+│   ├── api/                      # HTTP handlers и middleware
+│   ├── metrics/                  # Prometheus metrics
+│   ├── service/
+│   │   ├── grpc_generator/       # gRPC implementation
+│   │   └── queue_generator/      # RabbitMQ implementation
+│   ├── storage/                  # PostgreSQL / in-memory storage
+│   └── ...
+├── loadtest/
+│   ├── fixtures/
+│   ├── smoke.js
+│   ├── load.js
+│   └── constant.js
+├── monitoring/
+│   └── prometheus.yml
+├── proto/                        # gRPC contracts
+├── worker/                       # Python worker (Git submodule)
 ├── docker-compose.yaml
 ├── Makefile
 └── README.md
@@ -151,25 +440,41 @@ JWT_SECRET=password
 
 ## Docker Compose
 
-Поднимает все сервисы:
+`docker-compose.yaml` поднимает:
 
-- **server** — Go-API
-- **worker** — Python-воркер
-- **db** — PostgreSQL
-- **redis** — кэш статусов
-- **rabbitmq** — очередь задач
-- **migrations** — применяет миграции при старте
+- **server** — Go HTTP API;
+- **worker** — Python worker;
+- **db** — PostgreSQL;
+- **redis** — status cache;
+- **rabbitmq** — message broker;
+- **migrations** — database migrations;
+- **prometheus** — сбор метрик;
+- **grafana** — визуализация метрик.
 
 ---
 
-## Режимы работы воркера
+## Режимы работы worker
 
-Воркер может запускаться в двух режимах (управляется через `execution_mode` в `config/worker_local.yaml`):
+Worker запускается в одном из двух режимов:
 
-- `grpc` — запускает gRPC-сервер (порт 50051).
-- `queue` — запускает consumer RabbitMQ.
+### gRPC
 
-При переключении режима достаточно перезапустить контейнер воркера.
+```yaml
+execution_mode: "grpc"
+max_workers: 1
+```
+
+Запускается gRPC server на порту `50051`.
+
+### RabbitMQ
+
+```yaml
+execution_mode: "queue"
+```
+
+Запускается RabbitMQ consumer.
+
+После изменения режима необходимо пересоздать/restart worker container.
 
 ---
 
@@ -178,6 +483,9 @@ JWT_SECRET=password
 - Go 1.26+
 - Python 3.13+
 - Docker & Docker Compose
-- PostgreSQL 18
-- Redis 7
-- RabbitMQ 3
+- PostgreSQL
+- Redis
+- RabbitMQ
+- Prometheus
+- Grafana
+- k6
