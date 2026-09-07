@@ -11,7 +11,7 @@ import (
 	postgres_package "agreements-generator/internal/storage/postgres"
 	"agreements-generator/internal/storage/storage_in_memory"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
@@ -48,7 +48,7 @@ func New(ctx context.Context, cfg *config.Config, logger loggerModule.Logger, en
 		generatorStorage = s
 		userStorage = s
 	case postgres:
-		conn, err := pgx.Connect(
+		pool, err := pgxpool.New(
 			ctx,
 			fmt.Sprintf(
 				"%v://%v:%v@%v:%v/%v",
@@ -63,7 +63,7 @@ func New(ctx context.Context, cfg *config.Config, logger loggerModule.Logger, en
 		if err != nil {
 			return nil, nil, fmt.Errorf("can't create storage: %w", err)
 		}
-		s := postgres_package.New(conn, logger, encoder, cfg.Storage.JobTTL)
+		s := postgres_package.New(pool, logger, encoder, cfg.Storage.JobTTL)
 		generatorStorage = s
 		userStorage = s
 	default:

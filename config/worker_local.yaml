@@ -1,5 +1,7 @@
 execution_mode: "queue" #grpc | queue
 
+max_workers: 1
+
 grpc_server:
   port: 50051
 
@@ -8,6 +10,7 @@ db:
   port: 5432
   db_name: "generator"
   user: "postgres"
+  max_conn: 10
 
 redis:
   host: "redis"

@@ -12,18 +12,19 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type StorageGenerator struct {
-	conn    *pgx.Conn
+	pool    *pgxpool.Pool
 	logger  logger_package.Logger
 	encoder encoder.Encoder
 	jobTTL  time.Duration
 }
 
-func New(conn *pgx.Conn, logger logger_package.Logger, encoder encoder.Encoder, jobTTL time.Duration) *StorageGenerator {
+func New(pool *pgxpool.Pool, logger logger_package.Logger, encoder encoder.Encoder, jobTTL time.Duration) *StorageGenerator {
 	s := &StorageGenerator{
-		conn:    conn,
+		pool:    pool,
 		logger:  logger,
 		encoder: encoder,
 		jobTTL:  jobTTL,
@@ -41,7 +42,7 @@ FROM archives a
 JOIN jobs j ON a.job_id=j.id
 WHERE a.job_id=$1;
 `
-	row := s.conn.QueryRow(ctx, stmt, jobID)
+	row := s.pool.QueryRow(ctx, stmt, jobID)
 
 	var (
 		status      string
@@ -62,7 +63,7 @@ FROM archives a
 JOIN jobs j ON a.job_id=j.id
 WHERE a.job_id=$1;
 `
-	row := s.conn.QueryRow(ctx, stmt, jobID)
+	row := s.pool.QueryRow(ctx, stmt, jobID)
 
 	var (
 		status       string
@@ -91,7 +92,7 @@ func (s *StorageGenerator) SaveResponse(
 	response *domain.GenResponse,
 	fatalGenErr error) error {
 
-	tx, err := s.conn.Begin(ctx)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return newDomainErrFromPgx(fmt.Errorf("can't begin transaction: %w", err))
 	}
@@ -129,7 +130,7 @@ func (s *StorageGenerator) StoreJob(ctx context.Context, job domain.Job, userID 
 INSERT INTO jobs (id, status, user_id)
 VALUES ($1, $2, $3); 
 `
-	if _, err := s.conn.Exec(ctx, stmt, job.ID, job.Status, userID); err != nil {
+	if _, err := s.pool.Exec(ctx, stmt, job.ID, job.Status, userID); err != nil {
 		return newDomainErrFromPgx(err)
 	}
 
@@ -142,7 +143,7 @@ UPDATE jobs
 SET status = $1, updated_at = $2
 WHERE id = $3;
 `
-	if _, err := s.conn.Exec(ctx, stmt, job.Status, time.Now(), job.ID); err != nil {
+	if _, err := s.pool.Exec(ctx, stmt, job.Status, time.Now(), job.ID); err != nil {
 		return newDomainErrFromPgx(err)
 	}
 
@@ -156,7 +157,7 @@ FROM jobs
 WHERE id = $1; 
 `
 	var status string
-	if err := s.conn.QueryRow(ctx, stmt, id).Scan(&status); err != nil {
+	if err := s.pool.QueryRow(ctx, stmt, id).Scan(&status); err != nil {
 		return "", newDomainErrFromPgx(err)
 	}
 
@@ -170,7 +171,7 @@ VALUES ($1, $2, $3)
 RETURNING id;
 `
 
-	row := s.conn.QueryRow(ctx, stmt, user.Login, user.Name, user.Password)
+	row := s.pool.QueryRow(ctx, stmt, user.Login, user.Name, user.Password)
 
 	var userID int
 	if err := row.Scan(&userID); err != nil {
@@ -186,7 +187,7 @@ SELECT id, password
 FROM users
 WHERE login = $1;
 `
-	row := s.conn.QueryRow(ctx, stmt, &login)
+	row := s.pool.QueryRow(ctx, stmt, &login)
 
 	var userID int
 	var password []byte
@@ -202,7 +203,7 @@ func (s *StorageGenerator) SaveRawArchive(ctx context.Context, jobID string, arc
 INSERT INTO input_archives (job_id, archive)
 VALUES ($1, $2);
 `
-	if _, err := s.conn.Exec(ctx, stmt, jobID, archive); err != nil {
+	if _, err := s.pool.Exec(ctx, stmt, jobID, archive); err != nil {
 		return newDomainErrFromPgx(err)
 	}
 
@@ -238,7 +239,7 @@ WHERE (NOW() - created_at) > $1;
 	ticker := time.NewTicker(s.jobTTL)
 
 	for range ticker.C {
-		tx, err := s.conn.Begin(ctx)
+		tx, err := s.pool.Begin(ctx)
 		if err != nil {
 			s.logger.Error("can't create cleanup transaction", logger_package.FieldError, err)
 			continue

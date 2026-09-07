@@ -14,7 +14,7 @@ server:
 grpc_client:
   host: "worker"
   port: 50051
-  job_max_duration: "30s"
+  job_max_duration: "2m"
   
 storage:
   job_ttl: "5m"

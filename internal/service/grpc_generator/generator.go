@@ -9,6 +9,7 @@ import (
 	"agreements-generator/internal/domain"
 	"agreements-generator/internal/gen_client"
 	"agreements-generator/internal/logger"
+	appmetrics "agreements-generator/internal/metrics"
 	"agreements-generator/internal/storage"
 
 	"github.com/google/uuid"
@@ -38,7 +39,24 @@ func NewGRPCGen(
 	}, nil
 }
 
-func (g *generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (string, error) {
+func (g *generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (jobID string, err error) {
+	start := time.Now()
+
+	defer func() {
+		result := "success"
+		if err != nil {
+			result = "error"
+		}
+
+		appmetrics.JobsSubmittedTotal.
+			WithLabelValues("grpc", result).
+			Inc()
+
+		appmetrics.JobSubmissionDuration.
+			WithLabelValues("grpc").
+			Observe(time.Since(start).Seconds())
+	}()
+
 	g.log.Debug("sending gRPC request",
 		"archive_size", len(archiveBytes),
 	)
@@ -171,6 +189,19 @@ func (g *generator) ProcessJob(
 	errChan chan error,
 	responseChan chan *domain.GenResponse) {
 
+	start := time.Now()
+	result := "success"
+
+	appmetrics.JobsInProgress.WithLabelValues("grpc").Inc()
+
+	defer func() {
+		appmetrics.JobsInProgress.WithLabelValues("grpc").Dec()
+
+		appmetrics.JobProcessingDuration.
+			WithLabelValues("grpc", result).
+			Observe(time.Since(start).Seconds())
+	}()
+
 	defer ctxCancel()
 	defer close(errChan)
 	defer close(responseChan)
@@ -184,47 +215,81 @@ func (g *generator) ProcessJob(
 	err := <-errChan
 	response := <-responseChan
 
+	finalizeCtx, finalizeCancel := context.WithTimeout(
+		context.WithoutCancel(jobCtx),
+		5*time.Second,
+	)
+	defer finalizeCancel()
+
 	g.log.Debug("response has been received")
 
 	failedJob := domain.Job{ID: job.ID, Status: domain.StatusFailed}
 	completedJob := domain.Job{ID: job.ID, Status: domain.StatusCompleted}
 
 	if err != nil {
-		if storageErr := g.storage.SaveResponse(jobCtx, failedJob, response, err); storageErr != nil {
+		result = "error"
+
+		if storageErr := g.storage.SaveResponse(finalizeCtx, failedJob, response, err); storageErr != nil {
 			g.log.Error("can't update job info", logger.FieldError, storageErr)
 		}
 
-		if storageErr := g.storage.UpdateJob(jobCtx, failedJob); storageErr != nil {
+		if storageErr := g.storage.UpdateJob(finalizeCtx, failedJob); storageErr != nil {
 			g.log.Error("job failed; can't update job status", logger.FieldError, storageErr)
 		}
 
-		if cacherErr := g.cacher.SetJobStatus(jobCtx, failedJob.ID, string(failedJob.Status)); cacherErr != nil {
+		if cacherErr := g.cacher.SetJobStatus(finalizeCtx, failedJob.ID, string(failedJob.Status)); cacherErr != nil {
 			g.log.Error("can't update job info in cache", logger.FieldError, cacherErr)
 		}
 
 		return
 	}
 
-	if storageErr := g.storage.SaveResponse(jobCtx, completedJob, response, nil); storageErr != nil {
+	if storageErr := g.storage.SaveResponse(finalizeCtx, completedJob, response, nil); storageErr != nil {
+		result = "error"
+
 		g.log.Error("can't update job info", logger.FieldError, storageErr)
 
-		if storageErr = g.storage.UpdateJob(jobCtx, failedJob); storageErr != nil {
+		if storageErr = g.storage.UpdateJob(finalizeCtx, failedJob); storageErr != nil {
 			g.log.Error("can't update job status", logger.FieldError, storageErr)
 		}
 
-		if cacherErr := g.cacher.SetJobStatus(jobCtx, failedJob.ID, string(failedJob.Status)); cacherErr != nil {
+		if cacherErr := g.cacher.SetJobStatus(finalizeCtx, failedJob.ID, string(failedJob.Status)); cacherErr != nil {
 			g.log.Error("can't update job info in cache", logger.FieldError, cacherErr)
 		}
 
 		return
 	}
 
-	if storageErr := g.storage.UpdateJob(jobCtx, completedJob); storageErr != nil {
+	if storageErr := g.storage.UpdateJob(finalizeCtx, completedJob); storageErr != nil {
+		result = "error"
+
 		g.log.Error("can't update job status", logger.FieldError, storageErr)
+
+		if cacherErr := g.cacher.SetJobStatus(
+			finalizeCtx,
+			failedJob.ID,
+			string(failedJob.Status),
+		); cacherErr != nil {
+			g.log.Error(
+				"can't update job info in cache",
+				logger.FieldError,
+				cacherErr,
+			)
+		}
+
+		return
 	}
 
-	if cacherErr := g.cacher.SetJobStatus(jobCtx, completedJob.ID, string(completedJob.Status)); cacherErr != nil {
-		g.log.Error("can't update job info in cache", logger.FieldError, cacherErr)
+	if cacherErr := g.cacher.SetJobStatus(
+		finalizeCtx,
+		completedJob.ID,
+		string(completedJob.Status),
+	); cacherErr != nil {
+		g.log.Error(
+			"can't update job info in cache",
+			logger.FieldError,
+			cacherErr,
+		)
 	}
 
 }
