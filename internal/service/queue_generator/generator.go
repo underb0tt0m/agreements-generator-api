@@ -168,25 +168,25 @@ func (g *generator) GetArchive(ctx context.Context, jobID string) ([]byte, error
 }
 
 func (g *generator) GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error) {
-	status, genErrs, genCnt, fatalGenErr, err := g.storage.GetArchiveInfo(ctx, jobID)
+	archiveInfo, err := g.storage.GetArchiveInfo(ctx, jobID)
 
 	if err != nil {
 		return nil, 0, fmt.Errorf("can't get archive info from store: %w", err)
 	}
 
-	jobStatus, statusErr := domain.JobStatusFromString(status)
+	jobStatus, statusErr := domain.JobStatusFromString(archiveInfo.Status)
 	if statusErr != nil {
 		return nil, 0, fmt.Errorf("can't convert job status: %w", statusErr)
 	}
 
 	if jobStatus != domain.StatusCompleted {
-		if fatalGenErr != "" {
-			return nil, 0, fmt.Errorf("can't get archive info: fatal generation error: %s: %w", fatalGenErr, domain.ErrInternal)
+		if archiveInfo.FatalGenErr != "" {
+			return nil, 0, fmt.Errorf("can't get archive info: fatal generation error: %s: %w", archiveInfo.FatalGenErr, domain.ErrInternal)
 		}
 		return nil, 0, fmt.Errorf("can't get archive info: %w", domain.ErrJobNotFinished)
 	}
 
-	return genErrs, genCnt, nil
+	return archiveInfo.Errors, archiveInfo.Count, nil
 }
 
 func (g *generator) publishJob(ctx context.Context, job domain.Job) error {

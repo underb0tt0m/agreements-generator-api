@@ -21,7 +21,7 @@ type redisCacher struct {
 	jobStatusTTL time.Duration
 }
 
-func New(host string, port string, password string, db int, jobStatusTTL time.Duration) Cacher {
+func New(host, port, password string, db int, jobStatusTTL time.Duration) Cacher {
 	client := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, port),
 		Password: password,
@@ -33,7 +33,7 @@ func New(host string, port string, password string, db int, jobStatusTTL time.Du
 	}
 }
 
-func (r *redisCacher) SetJobStatus(ctx context.Context, jobID string, status string) error {
+func (r *redisCacher) SetJobStatus(ctx context.Context, jobID, status string) error {
 	return r.client.Set(ctx, "job:"+jobID, status, r.jobStatusTTL).Err()
 }
 

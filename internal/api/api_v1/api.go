@@ -48,7 +48,7 @@ func (h *API) handleBulkGenerate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, h.Encoder, h.Log)
 		return
 	}
-	defer r.Body.Close()
+	domain.CloseObj(r.Body, h.Log)
 
 	h.Log.Debug("received archive", "size", len(archiveBytes))
 
@@ -222,5 +222,4 @@ func writeError(w http.ResponseWriter, err error, enc encoder.Encoder, l logger.
 	if _, writeErr := w.Write(responseBytes); writeErr != nil {
 		l.Error("failed to write error response body", logger.FieldError, writeErr)
 	}
-	return
 }

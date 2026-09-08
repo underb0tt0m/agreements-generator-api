@@ -16,7 +16,7 @@ import (
 type TokenManager interface {
 	Create(data any) (string, error)
 	Validate(token string) error
-	Parse(tokenString string, obj interface{}) error
+	Parse(tokenString string, obj any) error
 	GetPrefix() string
 }
 
@@ -29,7 +29,7 @@ type tokenMaker struct {
 	prefix        string
 }
 
-func New(l logger.Logger, e encoder.Encoder, ttl time.Duration, signM string, secret string, prefix string) TokenManager {
+func New(l logger.Logger, e encoder.Encoder, ttl time.Duration, signM, secret, prefix string) TokenManager {
 	var method jwt.SigningMethod
 	switch signM {
 	case config.ES256:
@@ -91,7 +91,7 @@ func (t *tokenMaker) Validate(tokenString string) error {
 	return nil
 }
 
-func (t *tokenMaker) Parse(tokenString string, obj interface{}) error {
+func (t *tokenMaker) Parse(tokenString string, obj any) error {
 	token, err := jwt.Parse(tokenString, t.createKeyFunc(t.secret))
 	if err != nil {
 		return fmt.Errorf("invalid token: %v, %w", err, domain.ErrInvalidToken)

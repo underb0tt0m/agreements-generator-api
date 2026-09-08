@@ -44,4 +44,5 @@ jwt:
   
 security:
   hash_cost: 10
+  min_password_len: 8
   

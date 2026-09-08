@@ -15,6 +15,15 @@ import (
 	"github.com/google/uuid"
 )
 
+type processJobParams struct {
+	Job          domain.Job
+	ArchiveBytes []byte
+	ErrChan      chan error
+	ResponseChan chan *domain.GenResponse
+}
+
+const errUpdateCache = "can't update job info in cache"
+
 type generator struct {
 	log            logger.Logger
 	storage        storage.GeneratorStorage
@@ -96,7 +105,15 @@ func (g *generator) BulkGenerate(ctx context.Context, archiveBytes []byte) (jobI
 
 	responseChan := make(chan *domain.GenResponse)
 	errChan := make(chan error)
-	go g.ProcessJob(job, archiveBytes, jobCtx, cancel, errChan, responseChan)
+	go g.ProcessJob(
+		jobCtx,
+		cancel,
+		processJobParams{
+			Job:          job,
+			ArchiveBytes: archiveBytes,
+			ErrChan:      errChan,
+			ResponseChan: responseChan,
+		})
 
 	return job.ID, nil
 }
@@ -160,34 +177,31 @@ func (g *generator) GetArchive(ctx context.Context, jobID string) ([]byte, error
 }
 
 func (g *generator) GetArchiveInfo(ctx context.Context, jobID string) ([]domain.FilesErrors, int, error) {
-	status, genErrs, genCnt, fatalGenErr, err := g.storage.GetArchiveInfo(ctx, jobID)
+	archiveInfo, err := g.storage.GetArchiveInfo(ctx, jobID)
 
 	if err != nil {
 		return nil, 0, fmt.Errorf("can't get archive info from store: %w", err)
 	}
 
-	jobStatus, statusErr := domain.JobStatusFromString(status)
+	jobStatus, statusErr := domain.JobStatusFromString(archiveInfo.Status)
 	if statusErr != nil {
 		return nil, 0, fmt.Errorf("can't convert job status: %w", statusErr)
 	}
 
 	if jobStatus != domain.StatusCompleted {
-		if fatalGenErr != "" {
-			return nil, 0, fmt.Errorf("can't get archive info: fatal generation error: %s: %w", fatalGenErr, domain.ErrInternal)
+		if archiveInfo.FatalGenErr != "" {
+			return nil, 0, fmt.Errorf("can't get archive info: fatal generation error: %s: %w", archiveInfo.FatalGenErr, domain.ErrInternal)
 		}
 		return nil, 0, fmt.Errorf("can't get archive info: %w", domain.ErrJobNotFinished)
 	}
 
-	return genErrs, genCnt, nil
+	return archiveInfo.Errors, archiveInfo.Count, nil
 }
 
 func (g *generator) ProcessJob(
-	job domain.Job,
-	archiveBytes []byte,
-	jobCtx context.Context,
+	ctx context.Context,
 	ctxCancel context.CancelFunc,
-	errChan chan error,
-	responseChan chan *domain.GenResponse) {
+	params processJobParams) {
 
 	start := time.Now()
 	result := "success"
@@ -203,28 +217,28 @@ func (g *generator) ProcessJob(
 	}()
 
 	defer ctxCancel()
-	defer close(errChan)
-	defer close(responseChan)
+	defer close(params.ErrChan)
+	defer close(params.ResponseChan)
 
 	g.log.Debug("connecting to gRPC")
 
-	go g.grpcClient.BulkGenerate(jobCtx, archiveBytes, responseChan, errChan)
+	go g.grpcClient.BulkGenerate(ctx, params.ArchiveBytes, params.ResponseChan, params.ErrChan)
 
 	g.log.Debug("waiting client's response")
 
-	err := <-errChan
-	response := <-responseChan
+	err := <-params.ErrChan
+	response := <-params.ResponseChan
 
 	finalizeCtx, finalizeCancel := context.WithTimeout(
-		context.WithoutCancel(jobCtx),
+		context.WithoutCancel(ctx),
 		5*time.Second,
 	)
 	defer finalizeCancel()
 
 	g.log.Debug("response has been received")
 
-	failedJob := domain.Job{ID: job.ID, Status: domain.StatusFailed}
-	completedJob := domain.Job{ID: job.ID, Status: domain.StatusCompleted}
+	failedJob := domain.Job{ID: params.Job.ID, Status: domain.StatusFailed}
+	completedJob := domain.Job{ID: params.Job.ID, Status: domain.StatusCompleted}
 
 	if err != nil {
 		result = "error"
@@ -238,7 +252,7 @@ func (g *generator) ProcessJob(
 		}
 
 		if cacherErr := g.cacher.SetJobStatus(finalizeCtx, failedJob.ID, string(failedJob.Status)); cacherErr != nil {
-			g.log.Error("can't update job info in cache", logger.FieldError, cacherErr)
+			g.log.Error(errUpdateCache, logger.FieldError, cacherErr)
 		}
 
 		return
@@ -254,7 +268,7 @@ func (g *generator) ProcessJob(
 		}
 
 		if cacherErr := g.cacher.SetJobStatus(finalizeCtx, failedJob.ID, string(failedJob.Status)); cacherErr != nil {
-			g.log.Error("can't update job info in cache", logger.FieldError, cacherErr)
+			g.log.Error(errUpdateCache, logger.FieldError, cacherErr)
 		}
 
 		return
@@ -271,7 +285,7 @@ func (g *generator) ProcessJob(
 			string(failedJob.Status),
 		); cacherErr != nil {
 			g.log.Error(
-				"can't update job info in cache",
+				errUpdateCache,
 				logger.FieldError,
 				cacherErr,
 			)
@@ -286,7 +300,7 @@ func (g *generator) ProcessJob(
 		string(completedJob.Status),
 	); cacherErr != nil {
 		g.log.Error(
-			"can't update job info in cache",
+			errUpdateCache,
 			logger.FieldError,
 			cacherErr,
 		)

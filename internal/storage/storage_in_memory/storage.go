@@ -8,7 +8,10 @@ import (
 
 	"agreements-generator/internal/config"
 	"agreements-generator/internal/domain"
+	"agreements-generator/internal/storage/postgres/views"
 )
+
+var errJobNotFound = fmt.Errorf("job not found: %w", domain.ErrNotFound)
 
 type JobData struct {
 	Status     domain.JobStatus
@@ -81,7 +84,7 @@ func (s *MemoryStorage) UpdateJob(_ context.Context, job domain.Job) error {
 	defer s.mu.Unlock()
 	jobData, exists := s.data[job.ID]
 	if !exists {
-		return fmt.Errorf("job not found: %w", domain.ErrNotFound)
+		return errJobNotFound
 	}
 	jobData.Status = job.Status
 	return nil
@@ -92,7 +95,7 @@ func (s *MemoryStorage) CheckJobStatus(_ context.Context, id string) (string, er
 	defer s.mu.RUnlock()
 	job, exists := s.data[id]
 	if !exists {
-		return "", fmt.Errorf("job not found: %w", domain.ErrNotFound)
+		return "", errJobNotFound
 	}
 	return string(job.Status), nil
 }
@@ -102,7 +105,7 @@ func (s *MemoryStorage) SaveResponse(_ context.Context, job domain.Job, response
 	defer s.mu.Unlock()
 	jobData, exists := s.data[job.ID]
 	if !exists {
-		return fmt.Errorf("job not found: %w", domain.ErrNotFound)
+		return errJobNotFound
 	}
 	if err != nil {
 		job.Status = domain.StatusFailed
@@ -121,7 +124,7 @@ func (s *MemoryStorage) GetArchive(_ context.Context, jobID string) (string, []b
 	defer s.mu.RUnlock()
 	job, exists := s.data[jobID]
 	if !exists {
-		return "", nil, "", fmt.Errorf("job not found: %w", domain.ErrNotFound)
+		return "", nil, "", errJobNotFound
 	}
 
 	var fatalErrString string
@@ -132,12 +135,12 @@ func (s *MemoryStorage) GetArchive(_ context.Context, jobID string) (string, []b
 	return string(job.Status), job.Archive, fatalErrString, nil
 }
 
-func (s *MemoryStorage) GetArchiveInfo(_ context.Context, jobID string) (string, []domain.FilesErrors, int, string, error) {
+func (s *MemoryStorage) GetArchiveInfo(_ context.Context, jobID string) (views.ArchiveInfo, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	job, exists := s.data[jobID]
 	if !exists {
-		return "", nil, 0, "", fmt.Errorf("job not found: %w", domain.ErrNotFound)
+		return views.ArchiveInfo{}, errJobNotFound
 	}
 
 	var fatalErrString string
@@ -145,7 +148,12 @@ func (s *MemoryStorage) GetArchiveInfo(_ context.Context, jobID string) (string,
 		fatalErrString = job.FatalError.Error()
 	}
 
-	return string(job.Status), job.Errors, job.GenCount, fatalErrString, nil
+	return views.ArchiveInfo{
+		Status:      string(job.Status),
+		Errors:      job.Errors,
+		Count:       job.GenCount,
+		FatalGenErr: fatalErrString,
+	}, nil
 }
 
 func (s *MemoryStorage) Register(_ context.Context, user domain.User) (int, error) {

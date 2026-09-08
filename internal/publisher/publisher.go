@@ -3,7 +3,7 @@ package publisher
 import (
 	"context"
 
-	"agreements-generator/internal/encoder"
+	enc_module "agreements-generator/internal/encoder"
 	"agreements-generator/internal/publisher/rabbit_publisher"
 )
 
@@ -15,11 +15,11 @@ type Publisher interface {
 func New(
 	host string,
 	port int,
-	username string,
-	password string,
-	vhost string,
+	username,
+	password,
+	vhost,
 	queue string,
-	encoder encoder.Encoder,
+	encoder enc_module.Encoder,
 ) (Publisher, error) {
 	return rabbit_publisher.New(host, port, username, password, vhost, queue, encoder)
 }

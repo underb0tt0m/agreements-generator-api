@@ -1,7 +1,10 @@
 package domain
 
 import (
+	"io"
 	"net/http"
+
+	loggerModule "agreements-generator/internal/logger"
 )
 
 type AppErr struct {
@@ -82,3 +85,9 @@ var (
 		Code:       1011,
 	}
 )
+
+func CloseObj(closer io.Closer, logger loggerModule.Logger) {
+	if err := closer.Close(); err != nil {
+		logger.Error("can't close object", loggerModule.FieldError, err)
+	}
+}

@@ -11,6 +11,7 @@ package mocks
 
 import (
 	domain "agreements-generator/internal/domain"
+	views "agreements-generator/internal/storage/postgres/views"
 	context "context"
 	reflect "reflect"
 
@@ -74,15 +75,12 @@ func (mr *MockGeneratorStorageMockRecorder) GetArchive(ctx, jobID any) *gomock.C
 }
 
 // GetArchiveInfo mocks base method.
-func (m *MockGeneratorStorage) GetArchiveInfo(ctx context.Context, jobID string) (string, []domain.FilesErrors, int, string, error) {
+func (m *MockGeneratorStorage) GetArchiveInfo(ctx context.Context, jobID string) (views.ArchiveInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetArchiveInfo", ctx, jobID)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].([]domain.FilesErrors)
-	ret2, _ := ret[2].(int)
-	ret3, _ := ret[3].(string)
-	ret4, _ := ret[4].(error)
-	return ret0, ret1, ret2, ret3, ret4
+	ret0, _ := ret[0].(views.ArchiveInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetArchiveInfo indicates an expected call of GetArchiveInfo.
@@ -186,4 +184,42 @@ func (m *MockUserStorage) Register(ctx context.Context, user domain.User) (int, 
 func (mr *MockUserStorageMockRecorder) Register(ctx, user any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockUserStorage)(nil).Register), ctx, user)
+}
+
+// MockInputArchiveStorer is a mock of InputArchiveStorer interface.
+type MockInputArchiveStorer struct {
+	ctrl     *gomock.Controller
+	recorder *MockInputArchiveStorerMockRecorder
+	isgomock struct{}
+}
+
+// MockInputArchiveStorerMockRecorder is the mock recorder for MockInputArchiveStorer.
+type MockInputArchiveStorerMockRecorder struct {
+	mock *MockInputArchiveStorer
+}
+
+// NewMockInputArchiveStorer creates a new mock instance.
+func NewMockInputArchiveStorer(ctrl *gomock.Controller) *MockInputArchiveStorer {
+	mock := &MockInputArchiveStorer{ctrl: ctrl}
+	mock.recorder = &MockInputArchiveStorerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockInputArchiveStorer) EXPECT() *MockInputArchiveStorerMockRecorder {
+	return m.recorder
+}
+
+// SaveRawArchive mocks base method.
+func (m *MockInputArchiveStorer) SaveRawArchive(ctx context.Context, jobID string, archive []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveRawArchive", ctx, jobID, archive)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveRawArchive indicates an expected call of SaveRawArchive.
+func (mr *MockInputArchiveStorerMockRecorder) SaveRawArchive(ctx, jobID, archive any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveRawArchive", reflect.TypeOf((*MockInputArchiveStorer)(nil).SaveRawArchive), ctx, jobID, archive)
 }
