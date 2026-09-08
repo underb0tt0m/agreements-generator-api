@@ -7,6 +7,7 @@ RATE ?= 8
 DURATION ?= 60s
 
 proto-go:
+	mkdir -p gen/go
 	protoc -I proto proto/generator/generator.proto \
 		--go_out=./gen/go/ \
 		--go_opt=paths=source_relative \
