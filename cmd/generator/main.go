@@ -13,6 +13,7 @@ import (
 	"agreements-generator/internal/api/api_v1"
 	"agreements-generator/internal/cache"
 	"agreements-generator/internal/config"
+	"agreements-generator/internal/domain"
 	"agreements-generator/internal/encoder/encoder_json"
 	"agreements-generator/internal/gen_client"
 	"agreements-generator/internal/hasher"
@@ -64,10 +65,10 @@ func main() {
 	}
 
 	grpcClient := gen_client.New(generator.NewGeneratorClient(conn), conn, logger)
-	defer grpcClient.Close()
+	domain.CloseObj(grpcClient, logger)
 
 	cacher := cache.New(cfg.Redis.Host, cfg.Redis.Port, cfg.Security.RedisPassword, cfg.Redis.Db, cfg.Redis.JobStatusTTL)
-	defer cacher.Close()
+	domain.CloseObj(cacher, logger)
 
 	publer, err := publisher.New(
 		cfg.RabbitMQ.Host,
@@ -81,7 +82,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("can't create publisher", loggerModule.FieldError, err)
 	}
-	defer publer.Close()
+	domain.CloseObj(publer, logger)
 
 	gen, err := service.NewGen(
 		cfg.ExecMod,
@@ -95,7 +96,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("can't init service layer", loggerModule.FieldError, err)
 	}
-	auth := service.NewAuth(userStorage, tokenMng, hashEr)
+	auth := service.NewAuth(userStorage, tokenMng, hashEr, cfg.Security.MinPasswordLen)
 
 	genHandler := api_v1.API{
 		Log:     logger,
@@ -129,14 +130,16 @@ func main() {
 	go func() {
 		defer wg.Done()
 		logger.Info(fmt.Sprintf("starting http server on port: %s...", cfg.Server.Port))
-		APIServer.ListenAndServe()
+		if err = APIServer.ListenAndServe(); err != nil {
+			logger.Error("can't start http server", loggerModule.FieldError, err)
+		}
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		<-stop
-		logger.Info(fmt.Sprintf("stopping http server..."))
+		logger.Info("stopping http server...")
 
 		shutDownCtx, cancel := context.WithTimeout(
 			context.Background(),

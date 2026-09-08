@@ -6,17 +6,17 @@ import (
 	"agreements-generator/internal/encoder"
 )
 
-type json_encoder struct {
+type jsonEncoder struct {
 }
 
 func New() encoder.Encoder {
-	return &json_encoder{}
+	return &jsonEncoder{}
 }
 
-func (e *json_encoder) Marshal(object any) ([]byte, error) {
+func (*jsonEncoder) Marshal(object any) ([]byte, error) {
 	return json.Marshal(object)
 }
 
-func (e *json_encoder) Unmarshal(data []byte, v any) error {
+func (*jsonEncoder) Unmarshal(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }

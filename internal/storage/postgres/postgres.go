@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"agreements-generator/internal/domain"
-	"agreements-generator/internal/encoder"
+	enc_package "agreements-generator/internal/encoder"
 	logger_package "agreements-generator/internal/logger"
+	"agreements-generator/internal/storage/postgres/views"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -18,11 +19,11 @@ import (
 type StorageGenerator struct {
 	pool    *pgxpool.Pool
 	logger  logger_package.Logger
-	encoder encoder.Encoder
+	encoder enc_package.Encoder
 	jobTTL  time.Duration
 }
 
-func New(pool *pgxpool.Pool, logger logger_package.Logger, encoder encoder.Encoder, jobTTL time.Duration) *StorageGenerator {
+func New(pool *pgxpool.Pool, logger logger_package.Logger, encoder enc_package.Encoder, jobTTL time.Duration) *StorageGenerator {
 	s := &StorageGenerator{
 		pool:    pool,
 		logger:  logger,
@@ -56,7 +57,7 @@ WHERE a.job_id=$1;
 	return status, archive, fatalGenErr, nil
 }
 
-func (s *StorageGenerator) GetArchiveInfo(ctx context.Context, jobID string) (string, []domain.FilesErrors, int, string, error) {
+func (s *StorageGenerator) GetArchiveInfo(ctx context.Context, jobID string) (views.ArchiveInfo, error) {
 	stmt := `
 SELECT j.status, a.gen_errors, COALESCE(a.gen_count, 0), COALESCE(a.fatal_gen_error, '') as fatal_gen_error
 FROM archives a
@@ -72,18 +73,23 @@ WHERE a.job_id=$1;
 		fatalGenErr  string
 	)
 	if err := row.Scan(&status, &genErrsBytes, &genCnt, &fatalGenErr); err != nil {
-		return "", nil, 0, "", newDomainErrFromPgx(err)
+		return views.ArchiveInfo{}, newDomainErrFromPgx(err)
 	}
 
 	var genErrs []domain.FilesErrors
 	if genErrsBytes != nil {
 		if err := s.encoder.Unmarshal(genErrsBytes, &genErrs); err != nil {
 			s.logger.Debug(fmt.Sprintf("can't marshal bytes into errors: %v", genErrsBytes))
-			return "", nil, 0, "", fmt.Errorf("can't marshal bytes into errors: %v, %w", err, domain.ErrInternal)
+			return views.ArchiveInfo{}, fmt.Errorf("can't marshal bytes into errors: %v, %w", err, domain.ErrInternal)
 		}
 	}
 
-	return status, genErrs, genCnt, fatalGenErr, nil
+	return views.ArchiveInfo{
+		Status:      status,
+		Errors:      genErrs,
+		Count:       genCnt,
+		FatalGenErr: fatalGenErr,
+	}, nil
 }
 
 func (s *StorageGenerator) SaveResponse(
@@ -96,7 +102,11 @@ func (s *StorageGenerator) SaveResponse(
 	if err != nil {
 		return newDomainErrFromPgx(fmt.Errorf("can't begin transaction: %w", err))
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err = tx.Rollback(ctx); err != nil {
+			s.logger.Error("can't rollback transaction", logger_package.FieldError, err)
+		}
+	}()
 
 	stmt := `
 INSERT INTO archives(job_id, archive, gen_count, gen_errors, fatal_gen_error) 
@@ -120,7 +130,9 @@ VALUES ($1, $2, $3, $4, $5);
 		return newDomainErrFromPgx(err)
 	}
 
-	tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		s.logger.Error("can't commit transaction", logger_package.FieldError, err)
+	}
 
 	return nil
 }
@@ -244,7 +256,6 @@ WHERE (NOW() - created_at) > $1;
 			s.logger.Error("can't create cleanup transaction", logger_package.FieldError, err)
 			continue
 		}
-		defer tx.Rollback(ctx)
 
 		cmdTag, err := tx.Exec(ctx, stmt, s.jobTTL)
 		if err != nil {
@@ -253,6 +264,9 @@ WHERE (NOW() - created_at) > $1;
 		}
 
 		s.logger.Debug(fmt.Sprintf("deleted jobs: %v", cmdTag.RowsAffected()))
-		tx.Commit(ctx)
+
+		if err = tx.Commit(ctx); err != nil {
+			s.logger.Error("can't commit transaction", logger_package.FieldError, err)
+		}
 	}
 }

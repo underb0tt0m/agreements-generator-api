@@ -17,21 +17,23 @@ type Auth interface {
 	LogIn(ctx context.Context, userData dto.LogInRequest) (string, error)
 }
 type auth struct {
-	storage  storage.UserStorage
-	tokenMng token_manager.TokenManager
-	hasher   hasher.Hasher
+	storage        storage.UserStorage
+	tokenMng       token_manager.TokenManager
+	hasher         hasher.Hasher
+	minPasswordLen int
 }
 
-func NewAuth(s storage.UserStorage, t token_manager.TokenManager, h hasher.Hasher) Auth {
+func NewAuth(s storage.UserStorage, t token_manager.TokenManager, h hasher.Hasher, minPasswordLen int) Auth {
 	return &auth{
-		storage:  s,
-		tokenMng: t,
-		hasher:   h,
+		storage:        s,
+		tokenMng:       t,
+		hasher:         h,
+		minPasswordLen: minPasswordLen,
 	}
 }
 
 func (a *auth) Register(ctx context.Context, userData dto.RegisterRequest) (string, error) {
-	if len(userData.Password) < 8 {
+	if len(userData.Password) < a.minPasswordLen {
 		return "", fmt.Errorf("can't register user, password is too short: %w", domain.ErrBadRequest)
 	}
 

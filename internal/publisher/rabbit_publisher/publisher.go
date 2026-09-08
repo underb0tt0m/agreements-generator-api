@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"agreements-generator/internal/encoder"
+	enc_module "agreements-generator/internal/encoder"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -19,17 +19,17 @@ type rabbitPublisher struct {
 	conn      *amqp.Connection
 	ch        *amqp.Channel
 	queueName string
-	encoder   encoder.Encoder
+	encoder   enc_module.Encoder
 }
 
 func New(
 	host string,
 	port int,
-	username string,
-	password string,
-	vhost string,
+	username,
+	password,
+	vhost,
 	queue string,
-	encoder encoder.Encoder,
+	encoder enc_module.Encoder,
 ) (*rabbitPublisher, error) { // TODO подумать на циклическими импортами
 	connString := fmt.Sprintf(
 		"amqp://%s:%s@%s:%d/%s",

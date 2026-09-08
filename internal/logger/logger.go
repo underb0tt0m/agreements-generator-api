@@ -122,8 +122,8 @@ func NewNoop() Logger {
 	return &NoOpLogger{}
 }
 
-func (l *NoOpLogger) Fatal(_ string, _ ...any) {}
-func (l *NoOpLogger) Error(_ string, _ ...any) {}
-func (l *NoOpLogger) Warn(_ string, _ ...any)  {}
-func (l *NoOpLogger) Debug(_ string, _ ...any) {}
-func (l *NoOpLogger) Info(_ string, _ ...any)  {}
+func (*NoOpLogger) Fatal(_ string, _ ...any) {}
+func (*NoOpLogger) Error(_ string, _ ...any) {}
+func (*NoOpLogger) Warn(_ string, _ ...any)  {}
+func (*NoOpLogger) Debug(_ string, _ ...any) {}
+func (*NoOpLogger) Info(_ string, _ ...any)  {}

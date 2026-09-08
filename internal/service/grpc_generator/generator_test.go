@@ -12,6 +12,7 @@ import (
 	logger_package "agreements-generator/internal/logger"
 	"agreements-generator/internal/mocks"
 	storage_package "agreements-generator/internal/storage"
+	"agreements-generator/internal/storage/postgres/views"
 
 	"go.uber.org/mock/gomock"
 )
@@ -25,19 +26,51 @@ func TestGenerator_GetArchiveInfo(t *testing.T) {
 	storage.
 		EXPECT().
 		GetArchiveInfo(ctx, "success").
-		Return("completed", nil, 1, "", nil)
+		Return(
+			views.ArchiveInfo{
+				Status:      "completed",
+				Errors:      nil,
+				Count:       1,
+				FatalGenErr: "",
+			},
+			nil,
+		)
 	storage.
 		EXPECT().
 		GetArchiveInfo(ctx, "wrong status").
-		Return("wrong status", nil, 0, "", nil)
+		Return(
+			views.ArchiveInfo{
+				Status:      "wrong status",
+				Errors:      nil,
+				Count:       0,
+				FatalGenErr: "",
+			},
+			nil,
+		)
 	storage.
 		EXPECT().
 		GetArchiveInfo(ctx, "job not completed").
-		Return("processing", nil, 0, "", nil)
+		Return(
+			views.ArchiveInfo{
+				Status:      "processing",
+				Errors:      nil,
+				Count:       0,
+				FatalGenErr: "",
+			},
+			nil,
+		)
 	storage.
 		EXPECT().
 		GetArchiveInfo(ctx, "error from storage").
-		Return("", nil, 0, "", domain.ErrStorageBadRequest)
+		Return(
+			views.ArchiveInfo{
+				Status:      "",
+				Errors:      nil,
+				Count:       0,
+				FatalGenErr: "",
+			},
+			domain.ErrStorageBadRequest,
+		)
 	client := mocks.NewMockGeneratorClient(ctrl)
 	cacher := mocks.NewMockCacher(ctrl)
 
@@ -796,7 +829,16 @@ func TestGeneratorProcessJob(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 
-			s.ProcessJob(tt.args.job, tt.args.archive, ctx, cancel, errChan, responseChan)
+			s.ProcessJob(
+				ctx,
+				cancel,
+				processJobParams{
+					Job:          tt.args.job,
+					ArchiveBytes: tt.args.archive,
+					ErrChan:      errChan,
+					ResponseChan: responseChan,
+				},
+			)
 		})
 	}
 }

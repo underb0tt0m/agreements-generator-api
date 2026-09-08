@@ -2,13 +2,15 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"agreements-generator/internal/config"
 	"agreements-generator/internal/domain"
-	"agreements-generator/internal/encoder"
+	enc_package "agreements-generator/internal/encoder"
 	loggerModule "agreements-generator/internal/logger"
 	postgres_package "agreements-generator/internal/storage/postgres"
+	"agreements-generator/internal/storage/postgres/views"
 	"agreements-generator/internal/storage/storage_in_memory"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,7 +24,7 @@ const (
 //go:generate mockgen -source=storage.go -destination=../mocks/storage.go -package=mocks
 type GeneratorStorage interface {
 	GetArchive(ctx context.Context, jobID string) (string, []byte, string, error)
-	GetArchiveInfo(ctx context.Context, jobID string) (string, []domain.FilesErrors, int, string, error)
+	GetArchiveInfo(ctx context.Context, jobID string) (views.ArchiveInfo, error)
 	SaveResponse(ctx context.Context, job domain.Job, response *domain.GenResponse, err error) error
 	StoreJob(ctx context.Context, job domain.Job, userID int) error
 	UpdateJob(ctx context.Context, job domain.Job) error
@@ -38,7 +40,7 @@ type InputArchiveStorer interface {
 	SaveRawArchive(ctx context.Context, jobID string, archive []byte) error
 }
 
-func New(ctx context.Context, cfg *config.Config, logger loggerModule.Logger, encoder encoder.Encoder) (GeneratorStorage, UserStorage, error) {
+func New(ctx context.Context, cfg *config.Config, logger loggerModule.Logger, encoder enc_package.Encoder) (GeneratorStorage, UserStorage, error) {
 	var userStorage UserStorage
 	var generatorStorage GeneratorStorage
 
@@ -67,7 +69,7 @@ func New(ctx context.Context, cfg *config.Config, logger loggerModule.Logger, en
 		generatorStorage = s
 		userStorage = s
 	default:
-		return nil, nil, fmt.Errorf("unvalid storage type in config")
+		return nil, nil, errors.New("unvalid storage type in config")
 	}
 
 	return generatorStorage, userStorage, nil

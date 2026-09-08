@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -71,6 +72,7 @@ type rabbitMQ struct {
 
 type security struct {
 	HashCost         int `yaml:"hash_cost" env-default:"10"`
+	MinPasswordLen   int `yaml:"min_password_len" env-default:"8"`
 	SecretKey        string
 	DBUser           string
 	DBPassword       string
@@ -88,11 +90,11 @@ func Load() (*Config, error) {
 	cfgPath := fetchConfigPath()
 
 	if cfgPath == "" {
-		return nil, fmt.Errorf("config path is empty")
+		return nil, errors.New("config path is empty")
 	}
 
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("config path does not exist")
+		return nil, errors.New("config path does not exist")
 	}
 
 	var cfg Config

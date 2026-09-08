@@ -31,7 +31,7 @@ func (h *hasher) Hash(data string) ([]byte, error) {
 	return hash, nil
 }
 
-func (h *hasher) Compare(hash []byte, data string) error {
+func (*hasher) Compare(hash []byte, data string) error {
 	if err := bcrypt.CompareHashAndPassword(hash, []byte(data)); err != nil {
 		return fmt.Errorf("error during hash comparing: %v, %w", err, domain.ErrHashComparing)
 	}

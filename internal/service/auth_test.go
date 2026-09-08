@@ -197,7 +197,7 @@ func TestAuth_Register(t *testing.T) {
 				tt.args.setupMocks(tt.fields.storage, tt.fields.tokenMng, tt.fields.hasher)
 			}
 
-			s := NewAuth(tt.fields.storage, tt.fields.tokenMng, tt.fields.hasher)
+			s := NewAuth(tt.fields.storage, tt.fields.tokenMng, tt.fields.hasher, 8)
 
 			token, err := s.Register(tt.args.ctx, tt.args.userData)
 
@@ -361,7 +361,7 @@ func TestAuth_LogIn(t *testing.T) {
 				tt.args.setupMocks(tt.fields.storage, tt.fields.tokenMng, tt.fields.hasher)
 			}
 
-			s := NewAuth(tt.fields.storage, tt.fields.tokenMng, tt.fields.hasher)
+			s := NewAuth(tt.fields.storage, tt.fields.tokenMng, tt.fields.hasher, 8)
 
 			token, err := s.LogIn(tt.args.ctx, tt.args.userData)
 
